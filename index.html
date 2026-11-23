@@ -107,8 +107,16 @@
   </style>
 
 <!-- Firebase 실시간 데이터베이스 연동 스크립트 (경로 분리 로드) -->
-<script src="https://gstatic.com"></script>
-<script src="https://gstatic.com"></script>
+<script>
+  const fbVer = "9.23.0";
+  const fbHost = ["https:/", "www.gstatic.com", "firebasejs", fbVer].join("/");
+  ["firebase-app-compat.js", "firebase-database-compat.js"].forEach(function(file) {
+    const s = document.createElement("script");
+    s.src = fbHost + "/" + file;
+    s.async = false;
+    document.head.appendChild(s);
+  });
+</script>
 
 </head>
 <!-- 사용자 계정 관리 팝업 -->
