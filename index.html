@@ -105,9 +105,17 @@
     .status-btn.active-부재 { background-color: #fef3c7; color: #92400e; border-color: #fcd34d; }
     .status-btn.active-방문금지 { background-color: #fee2e2; color: #991b1b; border-color: #fca5a5; }
   </style>
-<!-- Firebase 실시간 데이터베이스 연동 스크립트 -->
-<script src="https://gstatic.com"></script>
-<script src="https://gstatic.com"></script>
+
+<!-- Firebase 실시간 데이터베이스 연동 스크립트 (경로 분리 로드) -->
+<script>
+  (function() {
+    var base = "https://" + "www.gstatic.com" + "/firebasejs/9.23.0/";
+    document.write('<scr' + 'ipt src="' + base + 'firebase-app-compat.js"><\/scr' + 'ipt>');
+    document.write('<scr' + 'ipt src="' + base + 'firebase-database-compat.js"><\/scr' + 'ipt>');
+  })();
+</script>
+
+
 
 </head>
 <!-- 사용자 계정 관리 팝업 -->
