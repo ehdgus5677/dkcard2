@@ -1807,25 +1807,60 @@ function toggleUserRole(idx) {
 
 
     // 공식 게시판 열기 (권한에 따라 글쓰기 창 & 장로 전용 섹션 자동 제어)
+       let currentBoardTab = "general";
+
+    function switchBoardTab(tabKey) {
+      if (tabKey === "elder" && !canViewElderBoard(currentUser)) {
+        tabKey = "general";
+      }
+      currentBoardTab = tabKey;
+
+      const tabs = [
+        { key: "general", btnId: "tabBtnGeneral", secId: "generalBoardSection", activeBg: "#0284c7" },
+        { key: "service", btnId: "tabBtnService", secId: "serviceBoardSection", activeBg: "#0f766e" },
+        { key: "elder",   btnId: "tabBtnElder",   secId: "elderBoardSection",   activeBg: "#7c3aed" }
+      ];
+
+      tabs.forEach(function(t) {
+        const btn = document.getElementById(t.btnId);
+        const sec = document.getElementById(t.secId);
+        const isActive = (t.key === tabKey);
+
+        if (btn) {
+          if (t.key === "elder" && !canViewElderBoard(currentUser)) {
+            btn.style.display = "none";
+          } else {
+            btn.style.display = "block";
+            btn.style.background = isActive ? t.activeBg : "#f8fafc";
+            btn.style.color = isActive ? "#fff" : "#475569";
+            btn.style.border = isActive ? ("2px solid " + t.activeBg) : "1px solid #cbd5e1";
+          }
+        }
+        if (sec) {
+          sec.style.display = isActive ? "block" : "none";
+        }
+      });
+
+      // 글쓰기 선택창도 현재 보고 있는 탭에 맞춰 자동 동기화
+      const sel = document.getElementById("boardSectionSelect");
+      if (sel) sel.value = tabKey;
+
+      renderBoardPosts();
+    }
+
+    // 공식 게시판 열기
     function openBoardModal() {
       if (!currentUser) {
         alert("먼저 로그인해 주세요.");
         return;
       }
 
-      // 1. 글쓰기 영역: 오직 '관리자+장로' 계정에게만 노출
       const writeArea = document.getElementById("boardWriteArea");
       if (writeArea) {
         writeArea.style.display = canWriteElderBoard(currentUser) ? "block" : "none";
       }
 
-      // 2. 장로 전용 섹션: '장로' 및 '관리자+장로' 계정에게만 노출 (일반/순수 관리자는 숨김)
-      const elderSec = document.getElementById("elderBoardSection");
-      if (elderSec) {
-        elderSec.style.display = canViewElderBoard(currentUser) ? "block" : "none";
-      }
-
-      renderBoardPosts();
+      switchBoardTab(currentBoardTab || "general");
       document.getElementById("boardModal").style.display = "flex";
     }
 
@@ -1834,7 +1869,7 @@ function toggleUserRole(idx) {
     }
 
     // 게시글 등록 ('관리자+장로' 전용)
-        function addBoardPost() {
+    function addBoardPost() {
       if (!canWriteElderBoard(currentUser)) {
         alert("게시글 작성 권한이 없습니다. (관리자+장로 전용)");
         return;
@@ -1874,10 +1909,9 @@ function toggleUserRole(idx) {
       saveBoardPosts();
       titleInp.value = "";
       contentInp.innerHTML = "";
-      renderBoardPosts();
+      switchBoardTab(section);
       alert("게시글이 등록되었습니다.");
     }
-
 
     // 게시글 삭제 ('관리자+장로' 전용)
     function deleteBoardPost(postId) {
@@ -1892,24 +1926,40 @@ function toggleUserRole(idx) {
       renderBoardPosts();
     }
 
-    // 게시판 목록 렌더링 (일반 공지 + 장로 전용 분리 출력)
+    // 게시판 목록 렌더링 (일반 공지 / 봉사 및 회중용 / 장로 전용 분리 출력)
     function renderBoardPosts() {
       const generalList = document.getElementById("generalBoardList");
+      const serviceList = document.getElementById("serviceBoardList");
       const elderList = document.getElementById("elderBoardList");
       const canManage = canWriteElderBoard(currentUser);
 
       // 1. 일반 공지 렌더링
-      const generalPosts = BOARD_POSTS.filter(p => p.section === "general");
-      generalList.innerHTML = "";
-      if (generalPosts.length === 0) {
-        generalList.innerHTML = '<div style="padding:14px; text-align:center; background:#f8fafc; border-radius:8px; color:#94a3b8; font-size:13px;">등록된 일반 공지가 없습니다.</div>';
-      } else {
-        generalPosts.forEach(function(p) {
-          generalList.appendChild(createPostCardElement(p, "#e0f2fe", "#0369a1", canManage));
-        });
+      if (generalList) {
+        const generalPosts = BOARD_POSTS.filter(p => p.section === "general");
+        generalList.innerHTML = "";
+        if (generalPosts.length === 0) {
+          generalList.innerHTML = '<div style="padding:14px; text-align:center; background:#f8fafc; border-radius:8px; color:#94a3b8; font-size:13px;">등록된 일반 공지가 없습니다.</div>';
+        } else {
+          generalPosts.forEach(function(p) {
+            generalList.appendChild(createPostCardElement(p, "#e0f2fe", "#0369a1", canManage));
+          });
+        }
       }
 
-      // 2. 장로 전용 렌더링 (열람 권한이 있을 때만)
+      // 2. 봉사 및 회중용 렌더링
+      if (serviceList) {
+        const servicePosts = BOARD_POSTS.filter(p => p.section === "service");
+        serviceList.innerHTML = "";
+        if (servicePosts.length === 0) {
+          serviceList.innerHTML = '<div style="padding:14px; text-align:center; background:#f0fdfa; border-radius:8px; color:#0d9488; font-size:13px;">등록된 봉사 및 회중용 공지가 없습니다.</div>';
+        } else {
+          servicePosts.forEach(function(p) {
+            serviceList.appendChild(createPostCardElement(p, "#ccfbf1", "#0f766e", canManage));
+          });
+        }
+      }
+
+      // 3. 장로 전용 렌더링 (열람 권한이 있을 때만)
       if (canViewElderBoard(currentUser) && elderList) {
         const elderPosts = BOARD_POSTS.filter(p => p.section === "elder");
         elderList.innerHTML = "";
@@ -1922,8 +1972,7 @@ function toggleUserRole(idx) {
         }
       }
     }
-
-       function createPostCardElement(p, bgTint, accentColor, canManage) {
+    function createPostCardElement(p, bgTint, accentColor, canManage) {
       const card = document.createElement("div");
       card.style.cssText = "border:1px solid #e2e8f0; border-left:4px solid " + accentColor + "; border-radius:8px; padding:12px; background:#fff;";
 
@@ -1941,7 +1990,6 @@ function toggleUserRole(idx) {
         '<div class="board-post-body" style="font-size:13px; color:#334155; white-space:pre-wrap; word-break:break-word; line-height:1.5; background:' + bgTint + '40; padding:8px; border-radius:6px; margin-bottom:6px;">' + bodyHtml + '</div>' +
         '<div style="font-size:11px; color:#64748b; text-align:right;">작성자: <b>' + escapeHtml(p.author) + '</b> · ' + p.createdAt + '</div>';
 
-      // 붙여넣은 이미지가 카드 밖으로 삐져나가지 않게 크기 자동 조절
       card.querySelectorAll(".board-post-body img").forEach(function(img) {
         img.style.maxWidth = "100%";
         img.style.height = "auto";
@@ -1952,7 +2000,6 @@ function toggleUserRole(idx) {
 
       return card;
     }
-
 
     function escapeHtml(str) {
       if (!str) return "";
@@ -2118,33 +2165,41 @@ function toggleUserRole(idx) {
       <button type="button" onclick="closeLeaderModal()" style="width:100%; padding:11px; border:none; background:#0d9488; color:#fff; border-radius:8px; font-weight:bold; cursor:pointer;">확인 및 닫기</button>
     </div>
   </div>
-  <!-- 공식 게시판 팝업 (일반 공지 섹션 + 장로 전용 섹션) -->
+   <!-- 공식 게시판 팝업 (일반 공지 / 봉사 및 회중용 / 장로 전용 섹션 탭) -->
   <div id="boardModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center; padding:16px; box-sizing:border-box;">
     <div style="display:block; background:#fff; width:100%; max-width:480px; border-radius:16px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.2); max-height:90vh; overflow-y:auto; box-sizing:border-box;">
       
       <!-- 상단 타이틀 -->
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
         <h3 style="margin:0; font-size:18px; color:#1e293b;">📋 공식 게시판</h3>
         <button type="button" onclick="closeBoardModal()" style="background:none; border:none; font-size:20px; cursor:pointer; color:#64748b;">✕</button>
+      </div>
+
+      <!-- ★ 섹션 전환 탭 버튼 (일반 / 봉사 및 회중용 / 장로 전용) -->
+      <div style="display:flex; gap:6px; margin-bottom:14px;">
+        <button type="button" id="tabBtnGeneral" onclick="switchBoardTab('general')" style="flex:1; padding:9px 4px; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; border:2px solid #0284c7; background:#0284c7; color:#fff;">📢 일반 공지</button>
+        <button type="button" id="tabBtnService" onclick="switchBoardTab('service')" style="flex:1; padding:9px 4px; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; border:1px solid #cbd5e1; background:#f8fafc; color:#475569;">🤝 봉사 및 회중용</button>
+        <button type="button" id="tabBtnElder" onclick="switchBoardTab('elder')" style="display:none; flex:1; padding:9px 4px; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; border:1px solid #cbd5e1; background:#f8fafc; color:#475569;">🕊️ 장로 전용</button>
       </div>
 
       <!-- ✍️ 글쓰기 영역 ('관리자+장로' 계정에게만 표시됨) -->
       <div id="boardWriteArea" style="display:none; background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:12px; margin-bottom:16px;">
         <div style="font-size:13px; font-weight:bold; color:#1e293b; margin-bottom:8px;">✍️ 새 공지 작성 (관리자+장로 전용)</div>
         <div style="display:flex; gap:6px; margin-bottom:8px;">
-          <select id="boardSectionSelect" style="width:135px; flex-shrink:0; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; font-weight:bold; background:#fff; box-sizing:border-box;">
+          <select id="boardSectionSelect" style="width:145px; flex-shrink:0; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; font-weight:bold; background:#fff; box-sizing:border-box;">
             <option value="general">📢 일반 공지</option>
+            <option value="service">🤝 봉사 및 회중용</option>
             <option value="elder">🕊️ 장로 전용</option>
           </select>
           <input type="text" id="boardTitleInput" placeholder="제목을 입력하세요" style="flex:1; min-width:0; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; box-sizing:border-box;">
         </div>
-<div id="boardContentInput" contenteditable="true" style="width:100%; min-height:75px; max-height:250px; overflow-y:auto; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; line-height:1.4; box-sizing:border-box; margin-bottom:8px; background:#fff; white-space:pre-wrap; word-break:break-word;"></div>
+        <div id="boardContentInput" contenteditable="true" style="width:100%; min-height:75px; max-height:250px; overflow-y:auto; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; line-height:1.4; box-sizing:border-box; margin-bottom:8px; background:#fff; white-space:pre-wrap; word-break:break-word;"></div>
 
         <button type="button" onclick="addBoardPost()" style="width:100%; padding:9px; background:#0284c7; color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer;">게시글 등록하기</button>
       </div>
 
-      <!-- 1. 📢 일반 공지 섹션 (모든 팀원 열람 가능) -->
-      <div style="margin-bottom:18px;">
+      <!-- 1. 📢 일반 공지 섹션 -->
+      <div id="generalBoardSection" style="margin-bottom:14px;">
         <div style="font-size:15px; font-weight:bold; color:#0369a1; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
           <span>📢 일반 공지</span>
           <span style="font-size:11px; color:#64748b; font-weight:normal;">(전체 열람 가능)</span>
@@ -2152,8 +2207,17 @@ function toggleUserRole(idx) {
         <div id="generalBoardList" style="display:flex; flex-direction:column; gap:8px;"></div>
       </div>
 
-      <!-- 2. 🕊️ 장로 전용 섹션 ('장로' 및 '관리자+장로' 계정에게만 보임) -->
-      <div id="elderBoardSection" style="display:none; border-top:2px dashed #cbd5e1; padding-top:14px; margin-bottom:14px;">
+      <!-- 2. 🤝 봉사 및 회중용 섹션 -->
+      <div id="serviceBoardSection" style="display:none; margin-bottom:14px;">
+        <div style="font-size:15px; font-weight:bold; color:#0f766e; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+          <span>🤝 봉사 및 회중용 게시판</span>
+          <span style="font-size:11px; color:#0f766e; background:#ccfbf1; padding:2px 6px; border-radius:4px;">봉사·회중 안내</span>
+        </div>
+        <div id="serviceBoardList" style="display:flex; flex-direction:column; gap:8px;"></div>
+      </div>
+
+      <!-- 3. 🕊️ 장로 전용 섹션 ('장로' 및 '관리자+장로' 계정에게만 보임) -->
+      <div id="elderBoardSection" style="display:none; margin-bottom:14px;">
         <div style="font-size:15px; font-weight:bold; color:#7c3aed; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
           <span>🕊️ 장로 전용 게시판</span>
           <span style="font-size:11px; color:#7c3aed; background:#f3e8ff; padding:2px 6px; border-radius:4px;">장로 권한 전용</span>
@@ -2162,6 +2226,9 @@ function toggleUserRole(idx) {
       </div>
 
       <button type="button" onclick="closeBoardModal()" style="width:100%; padding:11px; border:1px solid #cbd5e1; background:#f8fafc; color:#334155; border-radius:8px; font-weight:bold; cursor:pointer;">닫기</button>
+    </div>
+  </div>
+
     </div>
   </div>
 
