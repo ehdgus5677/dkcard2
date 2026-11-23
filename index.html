@@ -311,7 +311,18 @@ function openZoneMap(zoneId) {
     // ==========================================
     // ★ Firebase 실시간 데이터베이스 연결 및 동기화
     // ==========================================
-    const firebaseConfig = {
+    if (typeof getTodayString === "undefined") {
+      window.getTodayString = function() {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      };
+    }
+
+    if (typeof ZONES_DATA === "undefined") {
+      window.ZONES_DATA = JSON.parse(localStorage.getItem("zonePctApp_v1")) || [];
+    }
+    
+const firebaseConfig = {
       apiKey: "AIzaSyD9Ivlvazp8oRsLPk00L7JIIE5oh0In1BQ",
       authDomain: "://firebaseapp.com",
       databaseURL: "https://dkcard-41af9-default-rtdb.asia-southeast1.firebasedatabase.app",
