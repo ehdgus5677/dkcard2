@@ -1181,12 +1181,12 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
     }
 
     function kickMember(zoneId, memberName) {
-      if (!currentUser || currentUser.role !== "관리자") return;
+      if (!isAdminUser(currentUser)) return;
       const z = ZONES_DATA.find(item => item.id === zoneId);
       if (!z) return;
       if (!confirm("[관리자 권한] '" + z.name + "' 참여 명단에서 '" + memberName + "'님을 제외할까요?")) return;
 
-      z.members = z.members.filter(m => m !== memberName);
+      z.members = (z.members || []).filter(m => m !== memberName);
       saveZones();
       renderLobby();
       renderActiveZone();
