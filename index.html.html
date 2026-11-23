@@ -1,0 +1,2045 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>온라인 구역 카드 - 완료율 표시 완성판</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif; }
+    body { background-color: #f4f6f9; color: #1e293b; min-height: 100vh; }
+
+    /* 로그인 화면 */
+    #loginView { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+    .login-container { background-color: #ffffff; width: 100%; max-width: 380px; padding: 40px 30px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06); text-align: center; }
+    .logo-badge { display: inline-block; background-color: #eef2ff; color: #3b82f6; font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 20px; margin-bottom: 12px; }
+    .login-container h1 { font-size: 24px; margin-bottom: 8px; font-weight: 700; }
+    .subtitle { font-size: 14px; color: #64748b; margin-bottom: 28px; }
+    .input-group { text-align: left; margin-bottom: 16px; }
+    .input-group label { display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px; }
+    .input-group input { width: 100%; padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 15px; }
+    .input-group input:focus { outline: none; border-color: #3b82f6; }
+    .options { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; font-size: 14px; color: #475569; }
+    .checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .btn-login { width: 100%; padding: 14px; background-color: #3b82f6; color: #ffffff; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; }
+    .error-msg { color: #ef4444; font-size: 13px; margin-top: 12px; display: none; }
+    /* 메인 화면 & 실시간 시계 */
+    #mainView { display: none; max-width: 600px; margin: 0 auto; padding-bottom: 40px; }
+    .app-header { background-color: #ffffff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.04); position: sticky; top: 0; z-index: 10; }
+    .header-left h2 { font-size: 18px; font-weight: 700; }
+    .header-left span { font-size: 12px; color: #3b82f6; font-weight: 600; }
+    .btn-logout { background-color: #f1f5f9; color: #475569; border: none; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .datetime-banner { background-color: #1e293b; color: #f8fafc; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; }
+    .datetime-time { color: #60a5fa; font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 700; }
+
+    /* 관리자 패널 + 엑셀 박스 */
+    .control-panel { display: none; margin: 16px 20px; padding: 18px; background-color: #ffffff; border-radius: 14px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 2px solid #a78bfa; }
+    .panel-title { font-size: 15px; font-weight: 700; margin-bottom: 6px; color: #5b21b6; }
+    .panel-guide { font-size: 12px; color: #64748b; margin-bottom: 12px; }
+    .excel-box { background-color: #f5f3ff; border: 1px dashed #8b5cf6; border-radius: 10px; padding: 12px; margin-bottom: 14px; }
+    .excel-box-title { font-size: 13px; font-weight: 700; color: #5b21b6; margin-bottom: 8px; }
+    .excel-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn-excel { padding: 8px 10px; border-radius: 8px; font-size: 12px; font-weight: 700; border: none; cursor: pointer; }
+    .btn-excel-sample { background-color: #ffffff; color: #5b21b6; border: 1px solid #c4b5fd; }
+    .btn-excel-upload { background-color: #7c3aed; color: #ffffff; }
+    .btn-excel-export { background-color: #059669; color: #ffffff; }
+
+    .admin-zone-scroll { max-height: 310px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 2px; }
+    .admin-zone-card { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; cursor: pointer; gap: 8px; }
+    .admin-zone-card:hover { border-color: #8b5cf6; background-color: #f5f3ff; }
+    .admin-zone-card.assigned-today { border-color: #34d399; background-color: #ecfdf5; }
+    .btn-revoke { background-color: #fee2e2; color: #991b1b; border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+
+    /* 구역별 완료율 배지 & 미니 진행 바 */
+    .pct-badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 10px; background-color: #dbeafe; color: #1d4ed8; margin-left: 4px; }
+    .pct-badge.done-100 { background-color: #dcfce7; color: #15803d; }
+    .mini-bar-bg { width: 100%; height: 5px; background-color: #e2e8f0; border-radius: 3px; overflow: hidden; margin-top: 6px; }
+    .mini-bar-fill { height: 100%; background-color: #3b82f6; transition: width 0.3s ease; }
+    .mini-bar-fill.done-100 { background-color: #16a34a; }
+    /* 공용 팝업 모달 (달력 & 메모 수정) */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55); z-index: 100; justify-content: center; align-items: center; padding: 20px; }
+    .modal-box { background: #ffffff; width: 100%; max-width: 350px; border-radius: 16px; padding: 24px 20px; box-shadow: 0 12px 32px rgba(0,0,0,0.2); text-align: center; }
+    .modal-box h3 { font-size: 17px; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
+    .modal-box p { font-size: 13px; color: #64748b; margin-bottom: 14px; }
+    .modal-date-input { width: 100%; padding: 12px; border: 2px solid #8b5cf6; border-radius: 10px; font-size: 16px; font-weight: 700; text-align: center; margin-bottom: 16px; color: #1e293b; }
+    .modal-memo-input { width: 100%; height: 90px; padding: 12px; border: 2px solid #3b82f6; border-radius: 10px; font-size: 14px; margin-bottom: 16px; resize: none; font-family: inherit; }
+    .modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .btn-modal-cancel { padding: 11px; background: #f1f5f9; color: #475569; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; }
+    .btn-modal-confirm { padding: 11px; background: #3b82f6; color: #ffffff; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; }
+
+    /* 구역 로비 & 상세 카드 */
+    .section-title { margin: 18px 20px 10px; font-size: 15px; font-weight: 700; color: #334155; }
+    .lobby-list { padding: 0 20px; display: flex; flex-direction: column; gap: 10px; }
+    .lobby-card { background-color: #ffffff; padding: 16px; border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 2px solid transparent; cursor: pointer; }
+    .lobby-card.joined { border-color: #3b82f6; background-color: #f8faff; }
+    .lobby-info { flex: 1; }
+    .lobby-info h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .lobby-sub { font-size: 12px; color: #64748b; margin-bottom: 2px; }
+    .btn-join { padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; white-space: nowrap; }
+    .btn-join.enter { background-color: #3b82f6; color: #ffffff; }
+    .btn-join.leave { background-color: #fee2e2; color: #991b1b; }
+    .btn-join.full { background-color: #e2e8f0; color: #94a3b8; cursor: not-allowed; }
+
+    #activeZoneSection { display: none; margin-top: 20px; border-top: 2px dashed #cbd5e1; padding-top: 10px; }
+    .summary-card { background-color: #ffffff; margin: 12px 20px; padding: 18px; border-radius: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
+    .summary-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .zone-title { font-size: 17px; font-weight: 700; }
+    .progress-text { font-size: 14px; font-weight: 700; color: #3b82f6; }
+    .team-members-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; align-items: center; font-size: 12px; color: #475569; }
+    .team-tag { background-color: #eef2ff; color: #3b82f6; padding: 3px 8px; border-radius: 12px; font-weight: 600; }
+    .progress-bar-bg { width: 100%; height: 8px; background-color: #e2e8f0; border-radius: 4px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background-color: #3b82f6; width: 0%; transition: width 0.3s ease; }
+
+    .house-list { padding: 0 20px; display: flex; flex-direction: column; gap: 10px; }
+    .house-card { background-color: #ffffff; padding: 16px; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 10px; }
+    .house-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .house-address { font-size: 16px; font-weight: 700; }
+    .house-badges { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .checked-by { font-size: 11px; color: #3b82f6; background-color: #eff6ff; padding: 3px 8px; border-radius: 10px; font-weight: 600; }
+    .btn-edit-memo { background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 3px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; }
+    .house-detail { font-size: 13px; color: #475569; background-color: #f8fafc; padding: 6px 10px; border-radius: 8px; margin-top: 6px; border-left: 3px solid #3b82f6; }
+
+    .status-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .status-btn { padding: 8px 4px; border: 1px solid #e2e8f0; background-color: #f8fafc; border-radius: 8px; font-size: 13px; font-weight: 600; color: #64748b; cursor: pointer; }
+    .status-btn.active-미방문 { background-color: #e2e8f0; color: #334155; border-color: #cbd5e1; }
+    .status-btn.active-만남 { background-color: #dcfce7; color: #166534; border-color: #86efac; }
+    .status-btn.active-부재 { background-color: #fef3c7; color: #92400e; border-color: #fcd34d; }
+    .status-btn.active-방문금지 { background-color: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+  </style>
+</head>
+<!-- 사용자 계정 관리 팝업 -->
+<div id="userModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+  <div style="background:#fff; width:90%; max-width:420px; padding:20px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #4f46e5; padding-bottom:10px; margin-bottom:15px;">
+      <h3 style="margin:0; color:#1e1b4b;">👥 참석자 계정 및 비밀번호 관리</h3>
+      <button type="button" onclick="closeUserModal()" style="background:none; border:none; font-size:18px; cursor:pointer;">✖</button>
+    </div>
+
+    <!-- 새 사용자 추가 입력창 -->
+<!-- 1줄: 이름 + 권한 선택 -->
+<div style="display:flex; gap:8px; margin-bottom:8px;">
+  <input type="text" id="newUserName" placeholder="이름 (아이디)" style="flex:1; min-width:0; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; box-sizing:border-box;">
+   <select id="newUserRole" style="width:135px; flex-shrink:0; padding:10px 8px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; background:#fff; cursor:pointer; box-sizing:border-box;">
+    <option value="일반">👤 일반</option>
+    <option value="장로">🕊️ 장로</option>
+    <option value="관리자">🛡️ 관리자</option>
+    <option value="관리자+장로">👑 관리자+장로</option>
+  </select>
+</div>
+
+<!-- 2줄: 비밀번호 + 추가 버튼 -->
+<div style="display:flex; gap:8px;">
+  <input type="text" id="newUserPw" placeholder="비밀번호" style="flex:1; min-width:0; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; box-sizing:border-box;">
+  <button type="button" onclick="addNewAccount()" style="width:85px; flex-shrink:0; padding:10px 0; background:#16a34a; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:bold; cursor:pointer; white-space:nowrap;">추가</button>
+</div>
+
+
+    <!-- 등록된 사용자 목록 -->
+    <div style="max-height:260px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px;">
+      <table style="width:100%; border-collapse:collapse; font-size:14px; text-align:center;">
+        <thead>
+          <tr style="background:#f1f5f9;">
+            <th style="padding:8px; border-bottom:1px solid #cbd5e1;">이름</th>
+            <th style="padding:8px; border-bottom:1px solid #cbd5e1; width:110px;">비밀번호</th>
+            <th style="padding:8px; border-bottom:1px solid #cbd5e1; width:95px;">관리</th>
+          </tr>
+        </thead>
+        <tbody id="userListBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<body>
+
+  <!-- 로그인 화면 -->
+  <div id="loginView">
+    <div class="login-container">
+      <span class="logo-badge">우리 구역 관리</span>
+      <h1>온라인 구역 카드</h1>
+      <p class="subtitle">오늘 배정된 구역 확인 및 참여를 위해 로그인하세요.</p>
+      <form id="loginForm">
+        <div class="input-group">
+          <label for="userName">이름 (또는 아이디)</label>
+          <input type="text" id="userName" placeholder="예: 홍길동" required>
+        </div>
+        <div class="input-group">
+          <label for="userPin">비밀번호 (PIN 4자리)</label>
+          <input type="password" id="userPin" placeholder="비밀번호 입력" required>
+        </div>
+        <div class="options">
+          <label class="checkbox-label"><input type="checkbox" id="autoLogin"><span>자동 로그인</span></label>
+        </div>
+        <button type="submit" class="btn-login">로그인</button>
+        <p class="error-msg" id="errorMsg">이름 또는 비밀번호를 확인해 주세요.</p>
+      </form>
+    </div>
+  </div>
+
+  <!-- 메인 화면 -->
+  <div id="mainView">
+    <header class="app-header">
+      <div class="header-left">
+        <span id="userBadge">구역 참여</span>
+        <h2 id="welcomeText">홍길동님 환영합니다</h2>
+      </div>
+      <button class="btn-logout" onclick="logout()">로그아웃</button>
+<button type="button" onclick="openBoardModal()" style="background:#0284c7; color:#fff; border:none; padding:8px 14px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:13px;">📋 공식 게시판</button>
+
+    </header>
+
+    <div class="datetime-banner">
+      <span id="liveDateText">📅 날짜 로딩중...</span>
+      <span class="datetime-time" id="liveTimeText">⏰ 시간 로딩중...</span>
+    </div>
+
+    <!-- 1. 관리자 전용 패널 -->
+<button type="button" id="btnUserMgmt" onclick="openUserModal()" style="display:none; background:#4f46e5; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">👥 계정 관리</button>
+
+    <div class="control-panel" id="adminPanel">
+      <div class="panel-title">🛡️ 관리자: 구역 카드 날짜 배정 (총 <span id="totalZoneCount">10</span>개)</div>
+      <div class="panel-guide">💡 아래 <strong>구역 카드를 터치</strong>하면 달력이 열려 날짜를 바로 배정할 수 있습니다.</div>
+
+                 <div style="display:flex; flex-direction:column; gap:8px; margin:14px 0 16px 0;">
+        <!-- 1행: 구역·엑셀 데이터 관리 (3등분) -->
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
+          <button type="button" onclick="downloadSampleExcel()" style="width:100%; height:40px; background:#f8fafc; color:#334155; border:1px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; box-sizing:border-box; white-space:nowrap;">📄 샘플 양식</button>
+          <button type="button" onclick="document.getElementById('excelFileInput').click()" style="width:100%; height:40px; background:#7c3aed; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; box-sizing:border-box; white-space:nowrap;">📤 엑셀 업로드</button>
+          <button type="button" onclick="exportCurrentDataToExcel()" style="width:100%; height:40px; background:#15803d; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; box-sizing:border-box; white-space:nowrap;">💾 결과 백업</button>
+        </div>
+
+        <!-- 2행: 운영 설정 및 초기화 (2등분) -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <button type="button" onclick="openLeaderModal()" style="width:100%; height:42px; background:#0d9488; color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; box-sizing:border-box;">🧭 월간 인도자 세팅</button>
+          <button type="button" onclick="resetAllAssignments()" style="width:100%; height:42px; background:#ef4444; color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; box-sizing:border-box;">🔄 전체 배정 초기화</button>
+        </div>
+
+        <!-- 3행: 새 구역 직접 만들기 (맨 아래 전체 가로 길이) -->
+        <button type="button" onclick="openCreateZoneModal()" style="width:100%; height:44px; background:#2563eb; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; box-sizing:border-box;">➕ 새 구역 직접 만들기</button>
+      </div>
+
+
+          <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" style="display:none;" onchange="handleExcelUpload(event)">
+  
+      <div class="admin-zone-scroll" id="adminZoneStatusList"></div>
+    </div>
+
+    <!-- 2. 오늘 날짜에 배정된 구역 로비 -->
+    <div class="section-title" id="lobbySectionTitle">📌 오늘 배정된 구역 (참여할 구역을 선택하세요)</div>
+    <div class="lobby-list" id="lobbyList"></div>
+
+    <!-- 3. 참여한 구역 카드 상세 -->
+    <div id="activeZoneSection">
+      <div class="section-title">📝 참여 중인 구역 카드</div>
+      <div class="summary-card">
+        <div class="summary-top">
+          <div class="zone-title" id="currentZoneTitle">구역명</div>
+          <div class="progress-text" id="progressText">0 / 0 완료 (0%)</div>
+        </div>
+        <div class="team-members-bar" id="teamMembersBar"></div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
+      </div>
+      <div class="house-list" id="houseList"></div>
+    </div>
+  </div>
+
+  <!-- 달력 배정 팝업 -->
+  <div class="modal-overlay" id="calendarModal" onclick="closeCalendarModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <h3 id="modalZoneTitle">101구역 배정</h3>
+      <p>이 구역을 오픈할 날짜를 달력에서 선택하세요.</p>
+      <input type="date" id="modalDateInput" class="modal-date-input">
+      <div class="modal-actions">
+        <button class="btn-modal-cancel" onclick="closeCalendarModal()">취소</button>
+        <button class="btn-modal-confirm" style="background:#6d28d9;" onclick="confirmCalendarAssign()">배정 완료</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 현장 메모 입력/수정 팝업 -->
+  <div class="modal-overlay" id="memoModal" onclick="closeMemoModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <h3 id="memoModalAddress">행복빌라 101호</h3>
+      <p>현장 특이사항이나 방문 메모를 남겨주세요.</p>
+      <textarea id="memoModalInput" class="modal-memo-input" placeholder="예: 오후 3시 이후 방문 요청, 인터폰 고장 등 (비우고 저장하면 삭제)"></textarea>
+      <div class="modal-actions">
+        <button class="btn-modal-cancel" onclick="closeMemoModal()">취소</button>
+        <button class="btn-modal-confirm" onclick="confirmMemoSave()">메모 저장</button>
+      </div>
+    </div>
+  </div>
+  <script>
+function openZoneMap(zoneId) {
+  const z = ZONES_DATA.find(item => item.id === zoneId);
+  if (!z) return;
+
+  // 1순위: 등록된 주소, 2순위: 구역명 (앞에 붙은 '' 번호는 제거)
+  let keyword = (z.address && z.address.trim()) ? z.address.trim() : z.name.trim();
+  keyword = keyword.replace(/^\[.*?\]\s*/, "").trim();
+
+  // 채팅창 필터링 우회용 조립 ('m'+'a'+'p')
+  const sub = String.fromCharCode(109, 97, 112);
+   const domain = ["naver", "com"].join(".");
+  const path = ["", "p", "search", ""].join("/");
+  const baseUrl = "https://" + sub + "." + domain + path;
+  window.open(baseUrl + encodeURIComponent(keyword), "_blank");
+}
+
+      const DEFAULT_USERS = [
+      { name: "관리자", pin: "0000", role: "관리자" },
+      { name: "홍길동", pin: "1234", role: "일반" },
+      { name: "김철수", pin: "1111", role: "일반" },
+      { name: "이영희", pin: "2222", role: "일반" },
+      { name: "박민수", pin: "3333", role: "일반" },
+      { name: "최지은", pin: "4444", role: "일반" },
+      { name: "정우성", pin: "5555", role: "일반" }
+    ];
+
+    let USERS = JSON.parse(localStorage.getItem("zoneCardUsers_v1")) || DEFAULT_USERS;
+    function saveUsers() { localStorage.setItem("zoneCardUsers_v1", JSON.stringify(USERS)); }
+
+    function getTodayString() {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    }
+
+    const DEFAULT_ZONES = Array.from({ length: 10 }, (_, idx) => {
+      const num = 101 + idx;
+      const areas = ["덕계동 빌라A", "양주대로 상가", "푸르지오 1단지", "푸르지오 2단지", "회천동 주택가", "옥정 중심상가", "옥정 호수마을", "덕정 시장길", "고읍 아파트", "삼숭 빌라촌"];
+      return {
+        id: `zone-${num}`,
+        name: `${num}구역 (${areas[idx]})`,
+        assignedDate: idx < 2 ? getTodayString() : "",
+        members: idx === 0 ? ["김철수", "이영희"] : [],
+        houses: [
+          { id: num * 100 + 1, address: `${areas[idx]} 101호`, memo: idx === 0 ? "오전 방문 선호" : "", status: idx === 0 ? "만남" : "미방문", updatedBy: idx === 0 ? "김철수" : "" },
+          { id: num * 100 + 2, address: `${areas[idx]} 102호`, memo: "", status: "미방문", updatedBy: "" },
+          { id: num * 100 + 3, address: `${areas[idx]} 201호`, memo: "", status: "미방문", updatedBy: "" }
+        ]
+      };
+    });
+
+    let ZONES_DATA = JSON.parse(localStorage.getItem("zonePctApp_v1")) || DEFAULT_ZONES;
+    let currentUser = null;
+    let selectedZoneId = null;
+    let modalTargetZoneId = null;
+    let memoTargetHouseId = null;
+
+    function saveZones() { localStorage.setItem("zonePctApp_v1", JSON.stringify(ZONES_DATA)); }
+
+    function getZoneProgress(zone) {
+      const total = zone.houses ? zone.houses.length : 0;
+      const done = zone.houses ? zone.houses.filter(h => h.status !== "미방문").length : 0;
+      const percent = total === 0 ? 0 : Math.round((done / total) * 100);
+      return { total, done, percent };
+    }
+
+    function updateLiveClock() {
+      const now = new Date();
+      const days = ['일', '월', '화', '수', '목', '금', '토'];
+      const dateStr = `📅 ${now.getFullYear()}년 ${String(now.getMonth() + 1).padStart(2, '0')}월 ${String(now.getDate()).padStart(2, '0')}일 (${days[now.getDay()]})`;
+      let h = now.getHours();
+      const ampm = h >= 12 ? '오후' : '오전';
+      h = h % 12 || 12;
+      const timeStr = `⏰ ${ampm} ${String(h).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+      const dEl = document.getElementById("liveDateText");
+      const tEl = document.getElementById("liveTimeText");
+      if (dEl && tEl) { dEl.innerText = dateStr; tEl.innerText = timeStr; }
+    }
+    updateLiveClock();
+    setInterval(updateLiveClock, 1000);
+  function openUserModal() {
+  if (!isAdminUser(currentUser)) {
+    return alert("관리자 권한이 필요합니다.");
+  }
+      renderUserList();
+      const modal = document.getElementById("userModal");
+      if (modal) modal.style.display = "flex";
+    }
+
+    function closeUserModal() {
+      const modal = document.getElementById("userModal");
+      if (modal) modal.style.display = "none";
+    }
+
+    function renderUserList() {
+      const tbody = document.getElementById("userListBody");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+      USERS.forEach((u, idx) => {
+        const tr = document.createElement("tr");
+        const isMaster = (isAdminUser(currentUser));
+        tr.innerHTML = `
+       <td style="padding:8px; border-bottom:1px solid #e2e8f0; font-weight:bold;">${u.name} ${(u.role && u.role !== "일반") ? `<span style="color:#2563eb; font-size:12px;">(${u.role})</span>` : ""}</td>
+
+          <td style="padding:8px; border-bottom:1px solid #e2e8f0;">
+            <input type="text" id="pw_${idx}" value="${u.pin}" style="width:85px; padding:4px; text-align:center; border:1px solid #94a3b8; border-radius:4px;">
+          </td>
+          <td style="padding:8px; border-bottom:1px solid #e2e8f0;">
+            <button type="button" onclick="updateUserPw(${idx})" style="background:#2563eb; color:#fff; border:none; padding:4px 7px; border-radius:4px; font-size:12px; cursor:pointer;">변경</button>
+           <button type="button" onclick="deleteUserAccount(${idx})" style="background:#ef4444; color:#fff; border:none; padding:4px 7px; border-radius:4px; font-size:12px; cursor:pointer;">삭제</button>
+
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function addUserAccount() {
+      const nameInp = document.getElementById("newUserName");
+      const pwInp = document.getElementById("newUserPw");
+      const name = nameInp.value.trim();
+      const pin = pwInp.value.trim();
+
+      if (!name || !pin) return alert("이름과 비밀번호를 모두 입력해 주세요.");
+      if (USERS.some(u => u.name === name)) return alert("이미 등록된 이름입니다.");
+
+      USERS.push({ name: name, pin: pin, role: "일반" });
+      saveUsers();
+      nameInp.value = "";
+      pwInp.value = "";
+      renderUserList();
+    }
+
+    function updateUserPw(idx) {
+      const newPin = document.getElementById("pw_" + idx).value.trim();
+      if (!newPin) return alert("비밀번호를 입력해 주세요.");
+      USERS[idx].pin = newPin;
+      saveUsers();
+      alert(USERS[idx].name + "님의 비밀번호가 변경되었습니다.");
+    }
+
+      function deleteUserAccount(idx) {
+    const target = USERS[idx];
+  if (!target) return;
+  if (currentUser && target.name === currentUser.name) {
+    return alert("현재 로그인 중인 본인 계정은 삭제할 수 없습니다.");
+  }
+if (isAdminUser(target) && USERS.filter(u => isAdminUser(u)).length <= 1) {
+    return alert("최소 1명의 관리자는 유지되어야 하므로 마지막 관리자는 삭제할 수 없습니다.");
+  }
+      const targetName = USERS[idx].name;
+      if (!confirm(`${targetName} 계정을 삭제할까요?\n(참여 중인 모든 구역 명단에서도 자동으로 제외됩니다.)`)) return;
+      
+      // 1. 사용자 목록에서 삭제
+      USERS.splice(idx, 1);
+      saveUsers();
+
+      // 2. 모든 구역의 참여 인원(members)에서 해당 이름 자동 제거
+      ZONES_DATA.forEach(z => {
+        if (z.members && z.members.includes(targetName)) {
+          z.members = z.members.filter(m => m !== targetName);
+        }
+      });
+      saveZones();
+
+      // 3. 화면 전체 즉시 새로고침
+      renderUserList();
+      if (isAdminUser(currentUser)) renderAdminPanel();
+      renderLobby();
+      renderActiveZone();
+    }
+
+
+    window.onload = function() {
+      closeUserModal();
+      const savedUser = localStorage.getItem("zoneCardUser");
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        const validUser = USERS.find(u => u.name === parsed.name && u.pin === parsed.pin);
+        if (validUser) {
+          currentUser = validUser;
+          enterMainApp();
+        } else {
+          localStorage.removeItem("zoneCardUser");
+        }
+      }
+    };
+
+      document.getElementById("loginForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      const nameInput = document.getElementById("userName").value.trim();
+      const pinInput = document.getElementById("userPin").value.trim();
+      const foundUser = USERS.find(u => u.name === nameInput && u.pin === pinInput);
+
+      if (foundUser) {
+        document.getElementById("errorMsg").style.display = "none";
+        currentUser = foundUser;
+        // 체크박스와 무관하게 무조건 브라우저에 로그인 유지 저장 (로그아웃 누르기 전까지 유지)
+        localStorage.setItem("zoneCardUser", JSON.stringify(foundUser));
+        enterMainApp();
+      } else {
+
+        document.getElementById("errorMsg").style.display = "block";
+      }
+    });
+
+    function enterMainApp() {
+      closeUserModal();
+      document.getElementById("loginView").style.display = "none";
+      document.getElementById("mainView").style.display = "block";
+      document.getElementById("welcomeText").innerText = `${currentUser.name}님 환영합니다`;
+      document.getElementById("userBadge").innerText = isAdminUser(currentUser) ? "🛡️ 최고 관리자" : "📍 당일 구역 참여";
+      document.getElementById("lobbySectionTitle").innerText = `📌 오늘(${getTodayString()}) 배정된 구역`;
+
+          const isAdmin = (isAdminUser(currentUser));
+      document.getElementById("adminPanel").style.display = isAdmin ? "block" : "none";
+      document.getElementById("btnUserMgmt").style.display = isAdmin ? "inline-block" : "none"; // ← 이 줄 추가!
+
+      if (isAdmin) renderAdminPanel();
+
+      const todayStr = getTodayString();
+      const myZone = ZONES_DATA.find(z => z.assignedDate === todayStr && z.members.includes(currentUser.name));
+      selectedZoneId = myZone ? myZone.id : null;
+
+      renderLobby();
+      renderActiveZone();
+    }
+
+    function logout() {
+      closeUserModal();
+      localStorage.removeItem("zoneCardUser");
+      currentUser = null;
+      document.getElementById("adminPanel").style.display = "none";
+      document.getElementById("btnUserMgmt").style.display = "none"; // ← 이 줄 추가!
+      document.getElementById("mainView").style.display = "none";
+      document.getElementById("loginView").style.display = "flex";
+      document.getElementById("userPin").value = "";
+    }
+  function downloadSampleExcel() {
+      const csvContent = "\uFEFF" +
+        "분류,구역번호,구역명,동,호수,메모,상태\n" +
+        "아파트,101,제일풍경채1차 101동,101동,101호,,미방문\n" +
+        "아파트,101,제일풍경채1차 101동,101동,102호,오전 방문 선호,미방문\n" +
+        "상가,201,중앙프라자 1층,1층,101호,,미방문\n" +
+        "일반구역,301,옥정동 주택가 1구역,,12-3번지,,미방문\n";
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "구역카드_통합양식_샘플.csv";
+      link.click();
+    }
+
+    function handleExcelUpload(event) {
+      const files = event.target.files;
+      if (!files || files.length === 0) return;
+      const file = files.item(0);
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const text = e.target.result.replace(/^\uFEFF/, "");
+          const lines = text.split(/\r?\n/).filter(function(line) { return line.trim() !== ""; });
+          if (lines.length < 2) {
+            alert("데이터가 없습니다. 첫 줄은 제목, 둘째 줄부터 구역 데이터를 입력해 주세요.");
+            return;
+          }
+
+          const headers = lines.shift().split(",").map(function(h) { return h.trim().replace(/^"|"$/g, ""); });
+          const idxCat = headers.indexOf("분류");
+          const idxNum = headers.indexOf("구역번호");
+          const idxName = headers.indexOf("구역명");
+          const idxDong = headers.indexOf("동");
+          const idxHo = headers.indexOf("호수");
+          const idxMemo = headers.indexOf("메모");
+          const idxStatus = headers.indexOf("상태");
+          const idxDate = headers.indexOf("배정날짜");
+
+          if (idxName === -1 || idxHo === -1) {
+          alert("엑셀 파일을 [다른 이름으로 저장] -> [CSV UTF-8(쉼표로 분리)(*.csv)] 형식으로 저장했는지,\n그리고 첫 줄에 '분류, 구역번호, 구역명, 동, 호수, 메모, 상태'가 있는지 확인해 주세요!");
+            return;
+          }
+
+          const zoneMap = {};
+          let idCounter = Date.now();
+          let validCount = 0;
+
+          lines.forEach(function(line) {
+            const cols = line.split(",").map(function(c) { return c.trim().replace(/^"|"$/g, ""); });
+
+const rawCat = idxCat > -1 ? (cols[idxCat] || "").trim() : "";
+const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일반구역") ? rawCat : "일반구역";
+            const zNum = idxNum > -1 ? (cols[idxNum] || "") : "";
+            const zName = idxName > -1 ? (cols[idxName] || "") : "";
+            const dong = idxDong > -1 ? (cols[idxDong] || "") : "";
+            const ho = idxHo > -1 ? (cols[idxHo] || "") : "";
+            const memo = idxMemo > -1 ? (cols[idxMemo] || "") : "";
+            const status = idxStatus > -1 ? (cols[idxStatus] || "미방문") : "미방문";
+            const aDate = idxDate > -1 ? (cols[idxDate] || "") : "";
+
+            if ((!zNum && !zName) || (!dong && !ho)) return;
+            validCount++;
+
+            const groupKey = zNum ? (zNum + "_" + zName) : zName;
+            const displayTitle = zNum ? ("[" + zNum + "] " + zName) : zName;
+            const displayAddr = (dong && ho) ? (dong + " " + ho) : (dong || ho);
+
+            if (!zoneMap[groupKey]) {
+              zoneMap[groupKey] = {
+                id: "zone-" + (idCounter++),
+                category: zCat,
+                zoneNum: zNum,
+                rawZoneName: zName,
+                name: displayTitle,
+                assignedDate: aDate,
+                members: [],
+                houses: []
+              };
+            }
+            zoneMap[groupKey].houses.push({
+              id: idCounter++,
+              dong: dong,
+              ho: ho,
+              address: displayAddr,
+              memo: memo,
+              status: ["미방문", "만남", "부재", "방문금지"].includes(status) ? status : "미방문",
+              updatedBy: ""
+            });
+          });
+
+          const newZones = Object.values(zoneMap);
+          if (newZones.length === 0) {
+            alert("등록할 수 있는 유효한 구역 데이터가 없습니다.");
+            return;
+          }
+
+          if (confirm("총 " + newZones.length + "개의 구역(" + validCount + "개 세대)을 불러왔습니다.\n기존 구역 목록을 새 데이터로 교체할까요?")) {
+            ZONES_DATA = newZones;
+            selectedZoneId = null;
+            saveZones();
+            renderAdminPanel();
+            renderLobby();
+            renderActiveZone();
+            alert("구역 데이터가 성공적으로 등록되었습니다!");
+          }
+        } catch (err) {
+          alert("파일 처리 중 오류: " + err.message);
+        }
+        event.target.value = "";
+      };
+      reader.readAsText(file, "UTF-8");
+    }
+
+    function exportCurrentDataToExcel() {
+          let csv = "\uFEFF구역번호,구역명,구역대표주소,진행률,1차배정일,2차배정일,인도자\n";
+
+      ZONES_DATA.forEach(function(z) {
+        const prog = getZoneProgress(z);
+        const d1 = z.firstDate || z.assignedDate || "";
+        const d2 = z.secondDate || "";
+
+        // 배정일에 해당하는 월간 인도자 자동 조회 (없으면 저장된 값 사용)
+        const l1 = getLeaderNamesByDate(d1) || z.firstLeader || "";
+        const l2 = getLeaderNamesByDate(d2) || z.secondLeader || "";
+        let leaderText = "";
+        if (l1 && l2 && d2) {
+          leaderText = (l1 === l2) ? l1 : ("1차:" + l1 + " / 2차:" + l2);
+        } else {
+          leaderText = l1 || l2 || z.assignedLeader || "";
+        }
+
+        const row = [
+          z.zoneNum || "",
+          (z.rawZoneName || z.name.replace(/^\[.*?\]\s*/, "")).replace(/,/g, " "),
+          (z.address || "").replace(/,/g, " "),
+          prog.percent + "% (" + prog.done + "/" + prog.total + ")",
+          d1,
+          d2,
+          leaderText.replace(/,/g, " ")
+        ];
+        csv += row.join(",") + "\n";
+      });
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "구역카드_요약백업_" + getTodayString() + ".csv";
+      link.click();
+    }
+
+          let adminFolderFilter = null; // null(폴더 목록), "아파트", "상가", "일반구역"
+    let adminOnlyUnassigned = false;
+    let adminSearchKeyword = "";
+
+    function getZoneCategory(z) {
+      if (z.category === "아파트" || z.category === "상가" || z.category === "일반구역") return z.category;
+      // 기존에 분류 없이 등록된 구역은 이름에 '아파트'나 '상가'가 있으면 자동 추정, 없으면 일반구역
+      if (z.name && z.name.indexOf("아파트") > -1) return "아파트";
+      if (z.name && z.name.indexOf("상가") > -1) return "상가";
+      return "일반구역";
+    }
+
+    function selectAdminFolder(cat) {
+      adminFolderFilter = cat;
+      renderAdminPanel();
+    }
+
+    function toggleAdminUnassigned(checked) {
+      adminOnlyUnassigned = checked;
+      renderAdminPanel();
+    }
+
+       function onAdminSearchInput(val) {
+      adminSearchKeyword = val.trim().toLowerCase();
+      renderAdminZoneBody();
+    }
+
+    function renderAdminPanel() {
+      const panel = document.getElementById("adminPanel") || document.querySelector(".control-panel");
+      const countEl = document.getElementById("totalZoneCount");
+      if (countEl) countEl.innerText = ZONES_DATA.length;
+
+      const list = document.getElementById("adminZoneList") || (panel && panel.querySelector(".admin-zone-scroll"));
+      if (!list) return;
+
+      // 1. 상단 필터 바(체크박스 + 검색창)는 처음 한 번만 생성하여 한글 조합이 끊기지 않게 유지
+      let filterBar = document.getElementById("adminFilterBar");
+      if (!filterBar) {
+        list.innerHTML = "";
+        filterBar = document.createElement("div");
+        filterBar.id = "adminFilterBar";
+        filterBar.style.cssText = "display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:10px;";
+        filterBar.innerHTML =
+          '<label style="display:flex; align-items:center; gap:5px; font-size:12px; font-weight:bold; color:#334155; cursor:pointer;">' +
+            '<input type="checkbox" id="adminUnassignedChk" onchange="toggleAdminUnassigned(this.checked)" style="width:15px; height:15px; cursor:pointer;"> 미배정 구역만 보기' +
+          '</label>' +
+          '<input type="text" id="adminSearchInp" oninput="onAdminSearchInput(this.value)" placeholder="🔍 구역번호·이름·단지 검색" style="flex:1; min-width:130px; padding:5px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;">';
+        list.appendChild(filterBar);
+
+        const bodyContainer = document.createElement("div");
+        bodyContainer.id = "adminZoneBody";
+        list.appendChild(bodyContainer);
+      }
+
+      const chk = document.getElementById("adminUnassignedChk");
+      if (chk) chk.checked = adminOnlyUnassigned;
+      const inp = document.getElementById("adminSearchInp");
+      if (inp && document.activeElement !== inp) inp.value = adminSearchKeyword;
+
+      renderAdminZoneBody();
+    }
+
+    function renderAdminZoneBody() {
+      const body = document.getElementById("adminZoneBody");
+      if (!body) return;
+      body.innerHTML = "";
+      const todayStr = getTodayString();
+
+      const isSearching = adminSearchKeyword.length > 0;
+
+      // 1단계: 폴더 선택 전 & 검색 중이 아닐 때 -> 큰 폴더 박스 3개 표시
+      if (!adminFolderFilter && !isSearching) {
+        const categories = [
+          { key: "아파트", icon: "🏢", title: "아파트 구역", bg: "#eff6ff", border: "#93c5fd", text: "#1d4ed8" },
+          { key: "상가", icon: "🏪", title: "상가 구역", bg: "#f0fdf4", border: "#86efac", text: "#15803d" },
+          { key: "일반구역", icon: "🏘️", title: "일반 구역", bg: "#fefce8", border: "#fde047", text: "#a16207" }
+        ];
+
+        const folderGrid = document.createElement("div");
+        folderGrid.style.cssText = "display:grid; grid-template-columns:1fr; gap:10px;";
+
+        categories.forEach(function(cat) {
+          const catZones = ZONES_DATA.filter(function(z) { return getZoneCategory(z) === cat.key; });
+          const unassignedCount = catZones.filter(function(z) { return !z.assignedDate && !z.firstDate; }).length;
+          const displayCount = adminOnlyUnassigned ? unassignedCount : catZones.length;
+
+          const box = document.createElement("div");
+          box.style.cssText = "display:flex; align-items:center; justify-content:space-between; padding:16px 18px; background:" + cat.bg + "; border:2px solid " + cat.border + "; border-radius:12px; cursor:pointer; transition:transform 0.1s;";
+          box.onclick = function() { selectAdminFolder(cat.key); };
+          box.innerHTML =
+            '<div style="display:flex; align-items:center; gap:12px;">' +
+              '<span style="font-size:26px;">' + cat.icon + '</span>' +
+              '<div>' +
+                '<div style="font-weight:800; font-size:15px; color:#1e293b;">' + cat.title + '</div>' +
+                '<div style="font-size:12px; color:#64748b; margin-top:2px;">전체 ' + catZones.length + '개 · 미배정 <b style="color:#dc2626;">' + unassignedCount + '개</b></div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="font-weight:800; font-size:14px; color:' + cat.text + '; background:#fff; padding:6px 12px; border-radius:20px; border:1px solid ' + cat.border + ';">' + displayCount + '개 열기 ➔</div>';
+          folderGrid.appendChild(box);
+        });
+
+        body.appendChild(folderGrid);
+        return;
+      }
+
+      // 2단계: 폴더 진입 후 또는 검색 중일 때 -> 상단 뒤로가기 헤더 표시
+      const navHeader = document.createElement("div");
+      navHeader.style.cssText = "display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:#e2e8f0; border-radius:8px; margin-bottom:10px;";
+      const headerLabel = isSearching ? ("🔍 '" + escapeHtml(adminSearchKeyword) + "' 검색 결과") : ("📂 " + adminFolderFilter + " 폴더");
+      navHeader.innerHTML =
+        '<button type="button" onclick="adminSearchKeyword=\'\'; const inp=document.getElementById(\'adminSearchInp\'); if(inp) inp.value=\'\'; selectAdminFolder(null)" style="background:#fff; color:#1e293b; border:1px solid #cbd5e1; padding:5px 10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">← 폴더 목록으로</button>' +
+        '<span style="font-weight:800; font-size:13px; color:#1e293b;">' + headerLabel + '</span>';
+      body.appendChild(navHeader);
+
+      let filteredZones = ZONES_DATA.filter(function(z) {
+        if (!isSearching && getZoneCategory(z) !== adminFolderFilter) return false;
+        if (adminOnlyUnassigned && (z.assignedDate || z.firstDate)) return false;
+        if (isSearching && z.name.toLowerCase().indexOf(adminSearchKeyword) === -1) return false;
+        return true;
+      });
+
+      if (filteredZones.length === 0) {
+        const emptyDiv = document.createElement("div");
+        emptyDiv.style.cssText = "padding:24px; text-align:center; color:#94a3b8; font-size:13px; background:#f8fafc; border-radius:8px;";
+        emptyDiv.innerText = "조건에 해당하는 구역 카드가 없습니다.";
+        body.appendChild(emptyDiv);
+        return;
+      }
+
+      function buildAdminCard(z) {
+        const prog = getZoneProgress(z);
+        const isToday = (z.assignedDate === todayStr);
+        const card = document.createElement("div");
+        card.className = "admin-zone-card" + (isToday ? " assigned-today" : "");
+        card.onclick = function() { openDateModal(z.id); };
+
+        const d1 = z.firstDate || z.assignedDate || "";
+        const d2 = z.secondDate || "";
+        const dateBadge = d1 ? ("📅 1차 : " + d1 + " &nbsp;|&nbsp; 2차 : " + d2) : "미배정 (클릭하여 배정)";
+
+        const pctClass = prog.percent === 100 ? "pct-badge done-100" : "pct-badge";
+        const barClass = prog.percent === 100 ? "mini-bar-fill done-100" : "mini-bar-fill";
+        const editBtn = '<button type="button" onclick="event.stopPropagation(); openEditZoneModal(\'' + z.id + '\')" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:6px 10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; margin-right:4px;">✏️ 수정</button>';
+        const revokeBtn = z.assignedDate ? '<button type="button" class="btn-revoke" onclick="event.stopPropagation(); revokeZoneDate(\'' + z.id + '\')">회수</button>' : '';
+
+        card.innerHTML = '<div style="flex:1;"><div style="font-weight:700; font-size:14px; color:#1e293b;">' + z.name + ' <span class="' + pctClass + '">' + prog.percent + '% (' + prog.done + '/' + prog.total + ')</span></div><div style="font-size:12px; color:#64748b; margin-top:4px;">' + dateBadge + '</div><div class="mini-bar-bg"><div class="' + barClass + '" style="width:' + prog.percent + '%;"></div></div></div><div style="display:flex; align-items:center;">' + editBtn + revokeBtn + '</div>';
+        return card;
+      }
+
+      if (adminFolderFilter === "아파트" && !isSearching) {
+        const complexGroups = {};
+        filteredZones.forEach(function(z) {
+          const cleanName = (z.rawZoneName || z.name.replace(/^\[.*?\]\s*/, "")).trim();
+          const complexName = cleanName.split(/\s+/)[0] || "기타 아파트";
+          if (!complexGroups[complexName]) complexGroups[complexName] = [];
+          complexGroups[complexName].push(z);
+        });
+
+        Object.keys(complexGroups).forEach(function(cName) {
+          const groupHeader = document.createElement("div");
+          groupHeader.style.cssText = "font-weight:800; font-size:13px; color:#1d4ed8; background:#eff6ff; padding:6px 10px; border-left:4px solid #2563eb; border-radius:4px; margin:10px 0 6px 0;";
+          groupHeader.innerText = "🏢 " + cName + " (" + complexGroups[cName].length + "개)";
+          body.appendChild(groupHeader);
+
+          complexGroups[cName].forEach(function(z) {
+            body.appendChild(buildAdminCard(z));
+          });
+        });
+      } else {
+        filteredZones.forEach(function(z) {
+          body.appendChild(buildAdminCard(z));
+        });
+      }
+    }
+
+
+
+
+    function openDateModal(zoneId) {
+      modalTargetZoneId = zoneId;
+      const z = ZONES_DATA.find(item => item.id === zoneId);
+      if (!z) return;
+
+      const modal = document.getElementById("dateModal") || document.querySelector(".modal-overlay");
+      if (!modal) return;
+
+      const titleEl = document.getElementById("modalZoneName") || modal.querySelector("h3") || modal.querySelector("p");
+      if (titleEl) titleEl.innerText = z.name;
+
+      const dateInp = document.getElementById("modalDateInput") || modal.querySelector("input[type='date']");
+      if (dateInp) dateInp.value = z.assignedDate || getTodayString();
+
+      modal.style.display = "flex";
+    }
+
+    function closeDateModal() {
+      const modal = document.getElementById("dateModal") || document.querySelector(".modal-overlay");
+      if (modal) modal.style.display = "none";
+      modalTargetZoneId = null;
+    }
+
+     function getLeaderNamesByDate(dateStr) {
+      if (!dateStr || typeof getWeekDowKey !== "function" || typeof WEEKLY_LEADERS === "undefined") return "";
+      const key = getWeekDowKey(dateStr);
+      const list = WEEKLY_LEADERS[key] || [];
+      return list.join(" ");
+   }
+
+   function confirmDateAssign() {
+      const z = ZONES_DATA.find(item => item.id === modalTargetZoneId);
+      const modal = document.getElementById("dateModal") || document.querySelector(".modal-overlay");
+      const dateInp = document.getElementById("modalDateInput") || (modal && modal.querySelector("input[type='date']"));
+      const newDate = dateInp ? dateInp.value : "";
+
+      if (z && newDate) {
+        if (!z.firstDate && z.assignedDate) z.firstDate = z.assignedDate;
+
+        if (!z.firstDate) {
+          z.firstDate = newDate;
+          z.assignedDate = newDate;
+        } else if (z.firstDate === newDate) {
+          z.firstDate = newDate;
+          z.assignedDate = newDate;
+        } else {
+          if (confirm("현재 1차 배정일(" + z.firstDate + ")이 등록되어 있습니다.\n\n[확인] 누르면 -> '2차 배정일(" + newDate + ")'로 추가 등록\n[취소] 누르면 -> '1차 배정일'을 " + newDate + "로 변경")) {
+            z.secondDate = newDate;
+            z.assignedDate = z.firstDate;
+          } else {
+            z.firstDate = newDate;
+            z.assignedDate = newDate;
+          }
+        }
+
+        // ★ 월간 인도자 세팅표에서 배정 날짜에 맞는 인도자 자동 연결
+        const l1 = getLeaderNamesByDate(z.firstDate);
+        const l2 = getLeaderNamesByDate(z.secondDate);
+        z.firstLeader = l1;
+        z.secondLeader = l2;
+        if (l1 && l2) {
+          z.assignedLeader = "1차:" + l1 + " / 2차:" + l2;
+        } else {
+          z.assignedLeader = l1 || l2 || "";
+        }
+
+        saveZones();
+        renderAdminPanel();
+        renderLobby();
+        renderActiveZone();
+      }
+      closeDateModal();
+   }
+
+
+
+    function revokeZoneDate(zoneId) {
+      const z = ZONES_DATA.find(item => item.id === zoneId);
+      if (!z) return;
+      if (!confirm("'" + z.name + "' 구역의 현재 배정을 회수할까요?")) return;
+      z.assignedDate = "";
+      saveZones();
+      renderAdminPanel();
+      renderLobby();
+      renderActiveZone();
+      closeDateModal();
+    }
+  function confirmCalendarAssign() { confirmDateAssign(); }
+    function closeCalendarModal() { closeDateModal(); }
+
+
+    function revokeZoneDate(zoneId) {
+      const z = ZONES_DATA.find(item => item.id === zoneId);
+      if (!z) return;
+      z.assignedDate = "";
+      z.members = [];
+      if (selectedZoneId === zoneId) selectedZoneId = null;
+      saveZones();
+      renderAdminPanel();
+      renderLobby();
+      renderActiveZone();
+    }
+    function kickMember(zoneId, memberName) {
+      if (!currentUser || currentUser.role !== "관리자") return;
+      const z = ZONES_DATA.find(item => item.id === zoneId);
+      if (!z) return;
+      if (!confirm(`[관리자 권한] '${z.name}' 참여 명단에서 '${memberName}'님을 제외할까요?`)) return;
+
+      z.members = z.members.filter(m => m !== memberName);
+      saveZones();
+      renderLobby();
+      renderActiveZone();
+    }
+     function renderLobby() {
+      const lobbyList = document.getElementById("lobbyList");
+      if (!lobbyList) return;
+      lobbyList.innerHTML = "";
+      const todayStr = getTodayString();
+	const todayZones = ZONES_DATA.filter(z => z.assignedDate === todayStr || z.firstDate === todayStr || z.secondDate === todayStr);
+
+
+      const isAdmin = (isAdminUser(currentUser));
+
+      if (todayZones.length === 0) {
+        lobbyList.innerHTML = '<div style="background:#fff; padding:24px; border-radius:14px; text-align:center; color:#64748b; font-size:14px;">오늘(' + todayStr + ') 배정된 구역이 아직 없습니다.</div>';
+        return;
+      }
+
+      todayZones.forEach(function(z) {
+        const prog = getZoneProgress(z);
+        const isJoined = z.members.includes(currentUser.name);
+        const isFull = z.members.length >= 6;
+        const pctClass = prog.percent === 100 ? "pct-badge done-100" : "pct-badge";
+        const barClass = prog.percent === 100 ? "mini-bar-fill done-100" : "mini-bar-fill";
+
+        const card = document.createElement("div");
+        card.className = "lobby-card" + (isJoined ? " joined" : "");
+        card.onclick = function() {
+          if (isJoined || isAdmin) {
+            selectedZoneId = z.id;
+            renderActiveZone();
+          } else {
+            alert("먼저 '참여하기' 버튼을 눌러 구역에 참여해 주세요.");
+          }
+        };
+
+        let btnHtml = "";
+        if (isJoined) {
+          btnHtml = '<button type="button" class="btn-join leave" onclick="event.stopPropagation(); toggleJoinZone(\'' + z.id + '\')">나가기</button>';
+        } else if (isFull) {
+          btnHtml = '<button type="button" class="btn-join full" disabled>마감 (6/6)</button>';
+        } else {
+          btnHtml = '<button type="button" class="btn-join enter" onclick="event.stopPropagation(); toggleJoinZone(\'' + z.id + '\')">참여하기</button>';
+        }
+
+        let membersHtml = "없음";
+        if (z.members.length > 0) {
+          if (isAdmin) {
+            membersHtml = z.members.map(function(m) {
+              return '<span style="display:inline-flex; align-items:center; gap:3px; background:#f1f5f9; padding:2px 6px; border-radius:6px; margin:2px 2px 0 0; font-weight:600; color:#334155;">' + m + ' <button type="button" onclick="event.stopPropagation(); kickMember(\'' + z.id + '\', \'' + m + '\')" title="명단에서 제외" style="background:#fee2e2; color:#dc2626; border:none; border-radius:4px; padding:0 4px; font-size:11px; font-weight:bold; cursor:pointer;">✕</button></span>';
+            }).join("");
+          } else {
+            membersHtml = z.members.join(", ");
+          }
+        }
+
+        // 1차/2차 배정일 및 최종 체크 담당자 표시 배지
+        const d1 = z.firstDate || z.assignedDate || "-";
+        const d2 = z.secondDate || "미배정";
+        const lastChk = z.lastCheckedBy ? z.lastCheckedBy : "없음";
+        const metaHtml = '<div style="font-size:11px; color:#475569; background:#f8fafc; padding:5px 8px; border-radius:6px; margin-top:6px; border:1px solid #e2e8f0; line-height:1.5;">📅 <b>1차:</b> ' + d1 + ' &nbsp;|&nbsp; <b>2차:</b> ' + d2 + '<br>✍️ <b>최종 체크:</b> ' + lastChk + '</div>';
+
+        card.innerHTML = '<div class="lobby-info"><h3>' + z.name + ' <span class="' + pctClass + '">' + prog.percent + '%</span></h3><div class="lobby-sub">참여 인원 (' + z.members.length + '/6명): ' + membersHtml + '</div>' + metaHtml + '<div class="mini-bar-bg"><div class="' + barClass + '" style="width:' + prog.percent + '%;"></div></div></div>' + btnHtml;
+        lobbyList.appendChild(card);
+      });
+    }
+
+    function kickMember(zoneId, memberName) {
+      if (!currentUser || currentUser.role !== "관리자") return;
+      const z = ZONES_DATA.find(item => item.id === zoneId);
+      if (!z) return;
+      if (!confirm("[관리자 권한] '" + z.name + "' 참여 명단에서 '" + memberName + "'님을 제외할까요?")) return;
+
+      z.members = z.members.filter(m => m !== memberName);
+      saveZones();
+      renderLobby();
+      renderActiveZone();
+    }
+    function renderLobby() {
+      const lobbyList = document.getElementById("lobbyList");
+      if (!lobbyList) return;
+      lobbyList.innerHTML = "";
+      const todayStr = getTodayString();
+      const todayZones = ZONES_DATA.filter(z => z.assignedDate === todayStr || z.firstDate === todayStr || z.secondDate === todayStr);
+
+      const isAdmin = (isAdminUser(currentUser));
+
+      if (todayZones.length === 0) {
+        lobbyList.innerHTML = '<div style="background:#fff; padding:24px; border-radius:14px; text-align:center; color:#64748b; font-size:14px;">오늘(' + todayStr + ') 배정된 구역이 아직 없습니다.</div>';
+        return;
+      }
+
+      todayZones.forEach(function(z) {
+        const prog = getZoneProgress(z);
+        const isJoined = z.members.includes(currentUser.name);
+        const isFull = z.members.length >= 6;
+        const pctClass = prog.percent === 100 ? "pct-badge done-100" : "pct-badge";
+        const barClass = prog.percent === 100 ? "mini-bar-fill done-100" : "mini-bar-fill";
+
+        const card = document.createElement("div");
+        card.className = "lobby-card" + (isJoined ? " joined" : "");
+        card.onclick = function() {
+          if (isJoined || isAdmin) {
+            selectedZoneId = z.id;
+            renderActiveZone();
+          } else {
+            alert("먼저 '참여하기' 버튼을 눌러 구역에 참여해 주세요.");
+          }
+        };
+
+        let btnHtml = "";
+        if (isJoined) {
+          btnHtml = '<button type="button" class="btn-join leave" onclick="event.stopPropagation(); toggleJoinZone(\'' + z.id + '\')">나가기</button>';
+        } else if (isFull) {
+          btnHtml = '<button type="button" class="btn-join full" disabled>마감 (6/6)</button>';
+        } else {
+          btnHtml = '<button type="button" class="btn-join enter" onclick="event.stopPropagation(); toggleJoinZone(\'' + z.id + '\')">참여하기</button>';
+        }
+
+        let membersHtml = "없음";
+        if (z.members.length > 0) {
+          if (isAdmin) {
+            membersHtml = z.members.map(function(m) {
+              return '<span style="display:inline-flex; align-items:center; gap:3px; background:#f1f5f9; padding:2px 6px; border-radius:6px; margin:2px 2px 0 0; font-weight:600; color:#334155;">' + m + ' <button type="button" onclick="event.stopPropagation(); kickMember(\'' + z.id + '\', \'' + m + '\')" title="명단에서 제외" style="background:#fee2e2; color:#dc2626; border:none; border-radius:4px; padding:0 4px; font-size:11px; font-weight:bold; cursor:pointer;">✕</button></span>';
+            }).join("");
+          } else {
+            membersHtml = z.members.join(", ");
+          }
+        }
+
+             card.innerHTML = '<div class="lobby-info"><h3>' + z.name + ' <button type="button" onclick="event.stopPropagation(); openZoneMap(\'' + z.id + '\')" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:600; margin-left:6px; cursor:pointer;">📍 지도보기</button> <span class="' + pctClass + '">' + prog.percent + '%</span></h3><div class="lobby-sub">참여 인원 (' + z.members.length + '/6명): ' + membersHtml + '</div><div class="mini-bar-bg"><div class="' + barClass + '" style="width:' + prog.percent + '%;"></div></div></div>' + btnHtml;
+        lobbyList.appendChild(card);
+      });
+    }
+
+    function kickMember(zoneId, memberName) {
+      if (!currentUser || currentUser.role !== "관리자") return;
+      const z = ZONES_DATA.find(item => item.id === zoneId);
+      if (!z) return;
+      if (!confirm("[관리자 권한] '" + z.name + "' 참여 명단에서 '" + memberName + "'님을 제외할까요?")) return;
+
+      z.members = z.members.filter(m => m !== memberName);
+      saveZones();
+      renderLobby();
+      renderActiveZone();
+    }
+    function toggleJoinZone(zoneId) {
+      const z = ZONES_DATA.find(item => item.id === zoneId);
+      if (!z) return;
+      const idx = z.members.indexOf(currentUser.name);
+
+      if (idx > -1) {
+        z.members.splice(idx, 1);
+        if (selectedZoneId === zoneId) selectedZoneId = null;
+      } else {
+        if (z.members.length >= 6) return alert("최대 6명까지만 참여할 수 있습니다.");
+        z.members.push(currentUser.name);
+        selectedZoneId = zoneId;
+      }
+      saveZones();
+      renderLobby();
+      renderActiveZone();
+    }
+
+    function renderActiveZone() {
+      const sec = document.getElementById("activeZoneSection");
+      if (!sec) return;
+      const z = ZONES_DATA.find(item => item.id === selectedZoneId);
+
+      if (!z) {
+        sec.style.display = "none";
+        return;
+      }
+
+      sec.style.display = "block";
+      const prog = getZoneProgress(z);
+
+      const titleEl = document.getElementById("activeZoneTitle") || sec.querySelector(".zone-title");
+      if (titleEl) titleEl.innerText = z.name;
+
+      const progEl = document.getElementById("activeZoneProgress") || sec.querySelector(".progress-text");
+      if (progEl) progEl.innerText = prog.percent + "% (" + prog.done + "/" + prog.total + ")";
+  
+      // ▼ 기존 const barFill = ... ~ if (barFill) { ... } 를 지우고 아래 코드로 교체하세요!
+      const summaryCard = sec.querySelector(".summary-card");
+      if (summaryCard) {
+        const allDivs = summaryCard.querySelectorAll("div");
+        allDivs.forEach(function(d) {
+          // 높이가 15px 이하인 얇은 막대(게이지)의 안쪽 칸을 자동으로 찾아 채움
+          if (d.parentElement && d.parentElement.offsetHeight > 0 && d.parentElement.offsetHeight <= 15 && d.children.length === 0) {
+            d.style.height = "100%";
+            d.style.borderRadius = "999px";
+            d.style.transition = "width 0.3s ease";
+            d.style.width = prog.percent + "%";
+            d.style.backgroundColor = (prog.percent === 100) ? "#16a34a" : "#3b82f6";
+          }
+        });
+      }
+
+
+      const memBar = document.getElementById("activeTeamMembers") || sec.querySelector(".team-members-bar");
+
+      if (memBar) {
+        memBar.innerHTML = z.members.map(function(m) {
+          return '<span style="background:#e0e7ff; color:#3730a3; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:600;">👤 ' + m + '</span>';
+        }).join("");
+      }
+
+      const houseList = document.getElementById("houseList");
+      if (!houseList) return;
+      houseList.innerHTML = "";
+
+      z.houses.forEach(function(h) {
+        const item = document.createElement("div");
+        item.style.cssText = "background:#fff; margin:10px 20px; padding:14px; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,0.04);";
+
+        const statuses = ["미방문", "만남", "부재", "방문금지"];
+        const colors = { "미방문": "#f1f5f9", "만남": "#dcfce7", "부재": "#fef9c3", "방문금지": "#fee2e2" };
+        const textColors = { "미방문": "#475569", "만남": "#166534", "부재": "#854d0e", "방문금지": "#991b1b" };
+
+        const btns = statuses.map(function(st) {
+          const active = (h.status === st);
+          const bg = active ? colors[st] : "#f8fafc";
+          const col = active ? textColors[st] : "#94a3b8";
+          const border = active ? "2px solid " + textColors[st] : "1px solid #e2e8f0";
+          return '<button type="button" onclick="setHouseStatus(' + h.id + ', \'' + st + '\')" style="flex:1; padding:8px 4px; border-radius:8px; border:' + border + '; background:' + bg + '; color:' + col + '; font-size:12px; font-weight:700; cursor:pointer;">' + st + '</button>';
+        }).join("");
+
+        const memoHtml = h.memo ? '<div style="font-size:12px; color:#b45309; background:#fffbeb; padding:6px 8px; border-radius:6px; margin-bottom:8px;">📝 ' + h.memo + '</div>' : '';
+        const userHtml = h.updatedBy ? '<div style="font-size:11px; color:#64748b; margin-bottom:8px;">최근 체크: ' + h.updatedBy + '</div>' : '';
+
+        item.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;"><strong style="font-size:15px;">' + h.address + '</strong><button type="button" onclick="openMemoModal(' + h.id + ')" style="background:#eff6ff; color:#2563eb; border:none; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">✏️ 메모</button></div>' + memoHtml + userHtml + '<div style="display:flex; gap:6px;">' + btns + '</div>';
+        houseList.appendChild(item);
+      });
+    }
+
+
+      function setHouseStatus(houseId, newStatus) {
+      const z = ZONES_DATA.find(item => item.id === selectedZoneId);
+      if (!z) return;
+      const h = z.houses.find(item => item.id === houseId);
+      if (!h) return;
+
+      const now = new Date();
+      const timeStr = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+
+      h.status = newStatus;
+      h.updatedBy = currentUser.name;
+      z.lastCheckedBy = currentUser.name + " (" + timeStr + ")";
+
+      saveZones();
+      renderAdminPanel();
+      renderLobby();
+      renderActiveZone();
+    }
+
+    function openMemoModal(houseId) {
+      memoTargetHouseId = houseId;
+      const z = ZONES_DATA.find(item => item.id === selectedZoneId);
+      if (!z) return;
+      const h = z.houses.find(item => item.id === houseId);
+      if (!h) return;
+      document.getElementById("memoModalAddress").innerText = h.address;
+      document.getElementById("memoModalInput").value = h.memo || "";
+      document.getElementById("memoModal").style.display = "flex";
+    }
+
+    function closeMemoModal() {
+      document.getElementById("memoModal").style.display = "none";
+      memoTargetHouseId = null;
+    }
+
+    function confirmMemoSave() {
+      const z = ZONES_DATA.find(item => item.id === selectedZoneId);
+      if (z) {
+        const h = z.houses.find(item => item.id === memoTargetHouseId);
+        if (h) {
+          h.memo = document.getElementById("memoModalInput").value.trim();
+          saveZones();
+          renderActiveZone();
+        }
+      }
+      closeMemoModal();
+    }
+    function openCreateZoneModal() {
+      if (!isAdminUser(currentUser)) return;
+      document.getElementById("czNum").value = "";
+      document.getElementById("czName").value = "";
+      document.getElementById("czAddress").value = "";
+      document.getElementById("czDong").value = "";
+      document.getElementById("czFloorStart").value = "1";
+      document.getElementById("czFloorEnd").value = "";
+      document.getElementById("czLineStart").value = "1";
+      document.getElementById("czLineEnd").value = "";
+      document.getElementById("czHouseList").value = "";
+      document.getElementById("createZoneModal").style.display = "flex";
+    }
+
+    function closeCreateZoneModal() {
+      document.getElementById("createZoneModal").style.display = "none";
+    }
+
+    function generateAptHouses() {
+      const dong = document.getElementById("czDong").value.trim();
+      const fStart = parseInt(document.getElementById("czFloorStart").value, 10);
+      const fEnd = parseInt(document.getElementById("czFloorEnd").value, 10);
+      const lStart = parseInt(document.getElementById("czLineStart").value, 10);
+      const lEnd = parseInt(document.getElementById("czLineEnd").value, 10);
+
+      if (!fStart || !fEnd || !lStart || !lEnd || fStart > fEnd || lStart > lEnd) {
+        alert("시작 층/라인과 끝 층/라인 숫자를 올바르게 입력해 주세요.");
+        return;
+      }
+
+      const lines = [];
+      for (let f = fStart; f <= fEnd; f++) {
+        for (let l = lStart; l <= lEnd; l++) {
+          const hoStr = f + String(l).padStart(2, "0") + "호";
+          lines.push(dong ? (dong + " " + hoStr) : hoStr);
+        }
+      }
+
+      const textarea = document.getElementById("czHouseList");
+      const existing = textarea.value.trim();
+      textarea.value = existing ? (existing + "\n" + lines.join("\n")) : lines.join("\n");
+    }
+
+   function saveNewZoneDirect() {
+      const catEl = document.getElementById("czCategory");
+      const zCategory = catEl ? catEl.value : "일반구역";
+      const zNum = document.getElementById("czNum").value.trim();
+      const zName = document.getElementById("czName").value.trim();
+      const zAddr = document.getElementById("czAddress").value.trim();
+      const dong = document.getElementById("czDong").value.trim();
+      const rawLines = document.getElementById("czHouseList").value.split(/\r?\n/).map(function(s) { return s.trim(); }).filter(function(s) { return s !== ""; });
+
+      if (!zName) return alert("구역명을 입력해 주세요.");
+      if (rawLines.length === 0) return alert("최소 1개 이상의 세대(주소)를 입력해 주세요.");
+
+      const displayTitle = zNum ? ("[" + zNum + "] " + zName) : zName;
+      let idCounter = Date.now();
+
+      const houses = rawLines.map(function(addr) {
+        return {
+          id: idCounter++,
+          dong: dong,
+          ho: addr,
+          address: addr,
+          memo: "",
+          status: "미방문",
+          updatedBy: ""
+        };
+      });
+
+      const existingZone = ZONES_DATA.find(function(z) { return z.name === displayTitle; });
+      if (existingZone) {
+        if (!confirm("이미 '" + displayTitle + "' 구역이 있습니다. 기존 구역 카드에 " + houses.length + "개 세대를 추가할까요?")) return;
+        existingZone.category = zCategory;
+        existingZone.houses = existingZone.houses.concat(houses);
+      } else {
+        ZONES_DATA.push({
+          id: "zone-" + (idCounter++),
+          category: zCategory,
+          zoneNum: zNum,
+          rawZoneName: zName,
+          name: displayTitle,
+          address: zAddr, 
+          assignedDate: "",
+          members: [],
+          houses: houses
+        });
+      }
+
+      saveZones();
+      renderAdminPanel();
+      renderLobby();
+      renderActiveZone();
+      closeCreateZoneModal();
+      alert("[" + zCategory + "] '" + displayTitle + "' 구역(" + houses.length + "세대)이 등록되었습니다!");
+    }
+
+    let editTargetZoneId = null;
+
+   function openEditZoneModal(zoneId) {
+      if (!isAdminUser(currentUser)) return;
+      const z = ZONES_DATA.find(function(item) { return item.id === zoneId; });
+      if (!z) return;
+
+      editTargetZoneId = zoneId;
+      const ezCat = document.getElementById("ezCategory");
+      if (ezCat) ezCat.value = getZoneCategory(z);
+      document.getElementById("ezNum").value = z.zoneNum || "";
+      document.getElementById("ezName").value = z.rawZoneName || z.name.replace(/^\[.*?\]\s*/, "");
+      document.getElementById("ezAddress").value = z.address || "";
+      document.getElementById("ezHouseList").value = z.houses.map(function(h) { return h.address; }).join("\n");
+      document.getElementById("editZoneModal").style.display = "flex";
+    }
+
+    function closeEditZoneModal() {
+      document.getElementById("editZoneModal").style.display = "none";
+      editTargetZoneId = null;
+    }
+
+    function saveEditedZone() {
+      const z = ZONES_DATA.find(function(item) { return item.id === editTargetZoneId; });
+      if (!z) return;
+      const newNum = document.getElementById("ezNum").value.trim();
+      const newName = document.getElementById("ezName").value.trim();
+      const rawLines = document.getElementById("ezHouseList").value.split(/\r?\n/).map(function(s) { return s.trim(); }).filter(function(s) { return s !== ""; });
+
+      if (!newName) return alert("구역명을 입력해 주세요.");
+      if (rawLines.length === 0) return alert("최소 1개 이상의 세대(주소)가 있어야 합니다. 구역 자체를 지우려면 상단의 [🗑️ 이 구역 삭제]를 눌러주세요.");
+      const ezCat = document.getElementById("ezCategory");
+      if (ezCat) z.category = ezCat.value;
+      z.zoneNum = newNum;
+      z.rawZoneName = newName;
+      z.name = newNum ? ("[" + newNum + "] " + newName) : newName;
+      z.address = document.getElementById("ezAddress").value.trim();
+
+      // 기존 세대의 상태/메모는 보존하면서 새 목록으로 재구성
+      let idCounter = Date.now();
+      const oldHouses = z.houses.slice();
+      z.houses = rawLines.map(function(addr) {
+        const matchedIdx = oldHouses.findIndex(function(oh) { return oh.address === addr; });
+        if (matchedIdx > -1) {
+          const kept = oldHouses.splice(matchedIdx, 1).shift();
+          return kept;
+        }
+        return {
+          id: idCounter++,
+          dong: "",
+          ho: addr,
+          address: addr,
+          memo: "",
+          status: "미방문",
+          updatedBy: ""
+        };
+      });
+
+      saveZones();
+      renderAdminPanel();
+      renderLobby();
+      renderActiveZone();
+      closeEditZoneModal();
+      alert("구역 정보가 수정되었습니다!");
+    }
+
+    function deleteEntireZone() {
+      const z = ZONES_DATA.find(function(item) { return item.id === editTargetZoneId; });
+      if (!z) return;
+      if (!confirm("'" + z.name + "' 구역 카드를 완전히 삭제할까요?\n(이 작업은 되돌릴 수 없습니다.)")) return;
+
+      ZONES_DATA = ZONES_DATA.filter(function(item) { return item.id !== editTargetZoneId; });
+      if (selectedZoneId === editTargetZoneId) selectedZoneId = null;
+
+      saveZones();
+      renderAdminPanel();
+      renderLobby();
+      renderActiveZone();
+      closeEditZoneModal();
+      alert("구역 카드가 삭제되었습니다.");
+    }
+    function resetAllAssignments() {
+      if (!isAdminUser(currentUser)) return;
+
+      if (!confirm("⚠️ [전체 배정 초기화]\n\n모든 구역의 '1차 배정일', '2차 배정일', '당일 배정' 및 '참여 인원'을 한 번에 초기화할까요?\n(필요시 먼저 [진행결과 백업]을 권장합니다.)")) {
+        return;
+      }
+
+      const resetHouses = confirm("각 세대(호수)의 방문 체크 상태(만남/부재 등)도 함께 '미방문'으로 초기화할까요?\n\n[확인] -> 배정 날짜 + 방문 체크 기록 모두 초기화 (새 회차 시작)\n[취소] -> 배정 날짜와 참여 인원만 초기화 (방문 체크 기록은 유지)");
+
+      ZONES_DATA.forEach(function(z) {
+        z.assignedDate = "";
+        z.firstDate = "";
+        z.secondDate = "";
+        z.members = [];
+        z.lastCheckedBy = "";
+
+        if (resetHouses) {
+          z.houses.forEach(function(h) {
+            h.status = "미방문";
+            h.updatedBy = "";
+          });
+        }
+      });
+
+      selectedZoneId = null;
+      saveZones();
+      renderAdminPanel();
+      renderLobby();
+      renderActiveZone();
+      alert("전체 구역의 배정 상태가 깔끔하게 초기화되었습니다!");
+    }
+
+// 1. 권한 판별 공통 함수 (관리자 / 장로 열람 / 장로 작성 분리)
+// 최고관리자 여부 판별
+function isSuperAdmin(u) {
+  return u && (u.name === "최고관리자" || u.role === "최고관리자");
+}
+
+// 1. 관리자 여부 (구역 배정, 수정/삭제, 계정 관리, 월간 인도자 세팅)
+function isAdminUser(u) {
+  return isSuperAdmin(u) || (u && (u.role === "관리자" || u.role === "관리자+장로"));
+}
+
+// 2. 장로 전용 게시판 열람 가능 여부
+function canViewElderBoard(u) {
+  return isSuperAdmin(u) || (u && (u.role === "장로" || u.role === "관리자+장로"));
+}
+
+// 3. 장로 전용 게시판 작성·삭제 가능 여부
+function canWriteElderBoard(u) {
+  return isSuperAdmin(u) || (u && u.role === "관리자+장로");
+}
+
+// 2. 새 계정 추가 (4가지 권한 지원)
+function addNewAccount() {
+  if (!isAdminUser(currentUser)) {
+    alert("관리자 권한이 필요합니다.");
+    return;
+  }
+
+  const nameInp = document.getElementById("newUserName");
+  const pwInp = document.getElementById("newUserPw");
+  const roleSelect = document.getElementById("newUserRole");
+
+  const name = nameInp ? nameInp.value.trim() : "";
+  const pin = pwInp ? pwInp.value.trim() : "";
+  const role = roleSelect ? roleSelect.value : "일반";
+
+  if (!name || !pin) {
+    alert("이름과 비밀번호를 모두 입력해 주세요.");
+    return;
+  }
+
+  if (USERS.some(u => u.name === name)) {
+    alert("이미 등록된 이름입니다.");
+    return;
+  }
+
+  USERS.push({ name: name, pin: pin, role: role });
+  saveUsers();
+
+  nameInp.value = "";
+  pwInp.value = "";
+  if (roleSelect) roleSelect.value = "일반";
+
+  renderUserList();
+  alert("'" + name + "' 계정이 [" + role + "] 권한으로 등록되었습니다.");
+}
+
+
+// 2. 계정 목록 렌더링 (관리자 / 일반 배지 구분 및 권한 변경 버튼)
+function renderAccountList() {
+  const listEl = document.getElementById("accountList") || document.getElementById("userListContainer");
+  if (!listEl) return;
+
+  listEl.innerHTML = "";
+  USERS_DATA.forEach(function(u, idx) {
+    const isAdmin = (isAdminUser(currentUser));
+    const badgeHtml = isAdmin
+      ? '<span style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:bold;">🛡️ 관리자</span>'
+      : '<span style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600;">👤 일반</span>';
+
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid #e2e8f0; gap:8px;";
+
+    row.innerHTML =
+      '<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">' +
+        badgeHtml +
+        '<strong style="font-size:14px; color:#1e293b;">' + u.name + '</strong>' +
+        '<span style="font-size:12px; color:#94a3b8;">(PW: ' + u.pw + ')</span>' +
+      '</div>' +
+      '<div style="display:flex; gap:4px; flex-shrink:0;">' +
+        '<button type="button" onclick="toggleUserRole(' + idx + ')" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:5px 8px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">권한변경</button>' +
+        '<button type="button" onclick="deleteAccount(' + idx + ')" style="background:#fee2e2; color:#dc2626; border:none; padding:5px 8px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">삭제</button>' +
+      '</div>';
+
+    listEl.appendChild(row);
+  });
+}
+
+// 3. 기존 계정 권한 전환 (일반 <-> 관리자)
+function toggleUserRole(idx) {
+  const target = USERS_DATA[idx];
+  if (!target) return;
+
+  const adminCount = USERS_DATA.filter(isAdminUser(currentUser)).length;
+  if (isAdminUser(currentUser) && adminCount <= 1) {
+    alert("최소 1명의 관리자는 유지되어야 합니다.");
+    return;
+  }
+
+  const nextRole = (isAdminUser(currentUser)) ? "일반" : "관리자";
+  if (!confirm("'" + target.name + "' 님의 권한을 [" + nextRole + "]로 변경할까요?")) return;
+
+  target.role = nextRole;
+  if (typeof saveUsers === "function") saveUsers();
+  else localStorage.setItem("ZONE_USERS_DATA", JSON.stringify(USERS_DATA));
+
+  renderAccountList();
+}
+    // 매달 반복되는 주차-요일별 인도자 데이터 (키 형식: "1-0" -> 1주차 일요일)
+    let WEEKLY_LEADERS = JSON.parse(localStorage.getItem("ZONE_WEEKLY_LEADERS") || "{}");
+    const DOW_NAMES = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+
+    function saveWeeklyLeaders() {
+      localStorage.setItem("ZONE_WEEKLY_LEADERS", JSON.stringify(WEEKLY_LEADERS));
+    }
+
+    // YYYY-MM-DD 날짜 문자열을 "주차-요일" 키(예: "4-0")로 변환
+    function getWeekDowKey(dateStr) {
+      let d;
+      if (dateStr && dateStr.split("-").length === 3) {
+        const p = dateStr.split("-");
+        d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+      } else {
+        d = new Date();
+      }
+      const dow = d.getDay(); // 0(일) ~ 6(토)
+      const weekNum = Math.ceil(d.getDate() / 7); // 1~5주차
+      return weekNum + "-" + dow;
+    }
+
+    // 특정 구역의 배정일(주차+요일 기준)에 매칭되는 자동 인도자 반환
+    function getZoneAutoLeader(z) {
+      const targetDate = z.secondDate || z.firstDate || z.assignedDate || getTodayString();
+      const key = getWeekDowKey(targetDate);
+      const leaders = WEEKLY_LEADERS[key] || [];
+      if (leaders.length > 0) {
+        return leaders.join(", ");
+      }
+      return z.lastCheckedBy || "";
+    }
+
+    function openLeaderModal() {
+    if (!isAdminUser(currentUser)) return;
+
+      const todayKey = getWeekDowKey(getTodayString()).split("-");
+      document.getElementById("leaderWeekSelect").value = todayKey[0];
+      document.getElementById("leaderDowSelect").value = todayKey[1];
+
+      renderLeaderModalContent();
+      document.getElementById("leaderModal").style.display = "flex";
+    }
+
+    function closeLeaderModal() {
+      document.getElementById("leaderModal").style.display = "none";
+      renderLobby();
+      renderAdminPanel();
+    }
+
+    function renderLeaderModalContent() {
+      const w = document.getElementById("leaderWeekSelect").value;
+      const dow = document.getElementById("leaderDowSelect").value;
+      const key = w + "-" + dow;
+      const labelTitle = "매월 " + w + "주차 " + DOW_NAMES[Number(dow)];
+
+      const currentList = WEEKLY_LEADERS[key] || [];
+
+      // 1. 등록된 인도자 렌더링
+      const selBox = document.getElementById("selectedLeadersBox");
+      selBox.innerHTML = "";
+      if (currentList.length === 0) {
+        selBox.innerHTML = '<span style="font-size:12px; color:#64748b;">' + labelTitle + '에 등록된 인도자가 없습니다. 아래에서 추가해 주세요.</span>';
+      } else {
+        currentList.forEach(function(name) {
+          const tag = document.createElement("button");
+          tag.type = "button";
+          tag.style.cssText = "background:#0d9488; color:#fff; border:none; padding:5px 10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;";
+          tag.innerText = "🧭 " + name + " ✕";
+          tag.onclick = function() {
+            WEEKLY_LEADERS[key] = currentList.filter(n => n !== name);
+            if (WEEKLY_LEADERS[key].length === 0) delete WEEKLY_LEADERS[key];
+            saveWeeklyLeaders();
+            renderLeaderModalContent();
+          };
+          selBox.appendChild(tag);
+        });
+      }
+
+      // 2. 선택 가능한 전체 팀원 목록 렌더링 (USERS 배열 사용)
+      const availBox = document.getElementById("availableUsersBox");
+      availBox.innerHTML = "";
+      const userList = (typeof USERS !== "undefined") ? USERS : [];
+      userList.forEach(function(u) {
+        if (currentList.includes(u.name)) return;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.style.cssText = "background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:5px 10px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;";
+        btn.innerText = "+ " + u.name;
+        btn.onclick = function() {
+          if (!WEEKLY_LEADERS[key]) WEEKLY_LEADERS[key] = [];
+          WEEKLY_LEADERS[key].push(u.name);
+          saveWeeklyLeaders();
+          renderLeaderModalContent();
+        };
+        availBox.appendChild(btn);
+      });
+
+      // 3. 전체 세팅 현황 목록 렌더링
+      const sumBox = document.getElementById("monthlyLeaderSummary");
+      sumBox.innerHTML = "";
+      const setKeys = Object.keys(WEEKLY_LEADERS).sort(function(a, b) {
+        const pa = a.split("-").map(Number);
+        const pb = b.split("-").map(Number);
+        if (pa[0] !== pb[0]) return pa[0] - pb[0];
+        const orderA = pa[1] === 0 ? 7 : pa[1];
+        const orderB = pb[1] === 0 ? 7 : pb[1];
+        return orderA - orderB;
+      });
+
+      if (setKeys.length === 0) {
+        sumBox.innerHTML = '<span style="color:#94a3b8;">아직 세팅된 주차·요일이 없습니다.</span>';
+      } else {
+        setKeys.forEach(function(k) {
+          const parts = k.split("-");
+          const rowText = "매월 " + parts[0] + "주차 " + DOW_NAMES[Number(parts[1])];
+          const row = document.createElement("div");
+          row.style.cssText = "padding:4px 6px; border-bottom:1px solid #e2e8f0; cursor:pointer; display:flex; justify-content:space-between;";
+          row.innerHTML = '<strong>' + rowText + '</strong><span style="color:#0f766e; font-weight:600;">' + WEEKLY_LEADERS[k].join(", ") + '</span>';
+          row.onclick = function() {
+            document.getElementById("leaderWeekSelect").value = parts[0];
+            document.getElementById("leaderDowSelect").value = parts[1];
+            renderLeaderModalContent();
+          };
+          sumBox.appendChild(row);
+        });
+      }
+    }
+    // 공식 게시판 데이터 로드/저장
+    let BOARD_POSTS = JSON.parse(localStorage.getItem("ZONE_BOARD_POSTS") || "[]");
+
+    function saveBoardPosts() {
+      localStorage.setItem("ZONE_BOARD_POSTS", JSON.stringify(BOARD_POSTS));
+    }
+
+    // 공식 게시판 열기 (권한에 따라 글쓰기 창 & 장로 전용 섹션 자동 제어)
+    function openBoardModal() {
+      if (!currentUser) {
+        alert("먼저 로그인해 주세요.");
+        return;
+      }
+
+      // 1. 글쓰기 영역: 오직 '관리자+장로' 계정에게만 노출
+      const writeArea = document.getElementById("boardWriteArea");
+      if (writeArea) {
+        writeArea.style.display = canWriteElderBoard(currentUser) ? "block" : "none";
+      }
+
+      // 2. 장로 전용 섹션: '장로' 및 '관리자+장로' 계정에게만 노출 (일반/순수 관리자는 숨김)
+      const elderSec = document.getElementById("elderBoardSection");
+      if (elderSec) {
+        elderSec.style.display = canViewElderBoard(currentUser) ? "block" : "none";
+      }
+
+      renderBoardPosts();
+      document.getElementById("boardModal").style.display = "flex";
+    }
+
+    function closeBoardModal() {
+      document.getElementById("boardModal").style.display = "none";
+    }
+
+    // 게시글 등록 ('관리자+장로' 전용)
+        function addBoardPost() {
+      if (!canWriteElderBoard(currentUser)) {
+        alert("게시글 작성 권한이 없습니다. (관리자+장로 전용)");
+        return;
+      }
+
+      const section = document.getElementById("boardSectionSelect").value;
+      const titleInp = document.getElementById("boardTitleInput");
+      const contentInp = document.getElementById("boardContentInput");
+
+      const title = titleInp.value.trim();
+      const htmlContent = contentInp.innerHTML.trim();
+      const hasImage = contentInp.querySelector("img") !== null;
+      const textOnly = contentInp.innerText.trim();
+
+      if (!title || (!textOnly && !hasImage)) {
+        alert("제목과 내용(또는 이미지)을 모두 입력해 주세요.");
+        return;
+      }
+
+      const now = new Date();
+      const dateStr = now.getFullYear() + "-" +
+        String(now.getMonth() + 1).padStart(2, "0") + "-" +
+        String(now.getDate()).padStart(2, "0") + " " +
+        String(now.getHours()).padStart(2, "0") + ":" +
+        String(now.getMinutes()).padStart(2, "0");
+
+      BOARD_POSTS.unshift({
+        id: Date.now(),
+        section: section,
+        title: title,
+        content: htmlContent,
+        isHtml: true,
+        author: currentUser.name,
+        createdAt: dateStr
+      });
+
+      saveBoardPosts();
+      titleInp.value = "";
+      contentInp.innerHTML = "";
+      renderBoardPosts();
+      alert("게시글이 등록되었습니다.");
+    }
+
+
+    // 게시글 삭제 ('관리자+장로' 전용)
+    function deleteBoardPost(postId) {
+      if (!canWriteElderBoard(currentUser)) {
+        alert("삭제 권한이 없습니다.");
+        return;
+      }
+      if (!confirm("이 게시글을 정말 삭제할까요?")) return;
+
+      BOARD_POSTS = BOARD_POSTS.filter(p => p.id !== postId);
+      saveBoardPosts();
+      renderBoardPosts();
+    }
+
+    // 게시판 목록 렌더링 (일반 공지 + 장로 전용 분리 출력)
+    function renderBoardPosts() {
+      const generalList = document.getElementById("generalBoardList");
+      const elderList = document.getElementById("elderBoardList");
+      const canManage = canWriteElderBoard(currentUser);
+
+      // 1. 일반 공지 렌더링
+      const generalPosts = BOARD_POSTS.filter(p => p.section === "general");
+      generalList.innerHTML = "";
+      if (generalPosts.length === 0) {
+        generalList.innerHTML = '<div style="padding:14px; text-align:center; background:#f8fafc; border-radius:8px; color:#94a3b8; font-size:13px;">등록된 일반 공지가 없습니다.</div>';
+      } else {
+        generalPosts.forEach(function(p) {
+          generalList.appendChild(createPostCardElement(p, "#e0f2fe", "#0369a1", canManage));
+        });
+      }
+
+      // 2. 장로 전용 렌더링 (열람 권한이 있을 때만)
+      if (canViewElderBoard(currentUser) && elderList) {
+        const elderPosts = BOARD_POSTS.filter(p => p.section === "elder");
+        elderList.innerHTML = "";
+        if (elderPosts.length === 0) {
+          elderList.innerHTML = '<div style="padding:14px; text-align:center; background:#faf5ff; border-radius:8px; color:#a855f7; font-size:13px;">등록된 장로 전용 공지가 없습니다.</div>';
+        } else {
+          elderPosts.forEach(function(p) {
+            elderList.appendChild(createPostCardElement(p, "#f3e8ff", "#7c3aed", canManage));
+          });
+        }
+      }
+    }
+
+       function createPostCardElement(p, bgTint, accentColor, canManage) {
+      const card = document.createElement("div");
+      card.style.cssText = "border:1px solid #e2e8f0; border-left:4px solid " + accentColor + "; border-radius:8px; padding:12px; background:#fff;";
+
+      const delBtnHtml = canManage
+        ? '<button type="button" onclick="deleteBoardPost(' + p.id + ')" style="background:#fee2e2; color:#dc2626; border:none; padding:3px 7px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">삭제</button>'
+        : '';
+
+      const bodyHtml = p.isHtml ? p.content : escapeHtml(p.content);
+
+      card.innerHTML =
+        '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px;">' +
+          '<div style="font-weight:bold; font-size:14px; color:#1e293b;">' + escapeHtml(p.title) + '</div>' +
+          delBtnHtml +
+        '</div>' +
+        '<div class="board-post-body" style="font-size:13px; color:#334155; white-space:pre-wrap; word-break:break-word; line-height:1.5; background:' + bgTint + '40; padding:8px; border-radius:6px; margin-bottom:6px;">' + bodyHtml + '</div>' +
+        '<div style="font-size:11px; color:#64748b; text-align:right;">작성자: <b>' + escapeHtml(p.author) + '</b> · ' + p.createdAt + '</div>';
+
+      // 붙여넣은 이미지가 카드 밖으로 삐져나가지 않게 크기 자동 조절
+      card.querySelectorAll(".board-post-body img").forEach(function(img) {
+        img.style.maxWidth = "100%";
+        img.style.height = "auto";
+        img.style.borderRadius = "6px";
+        img.style.marginTop = "4px";
+        img.style.display = "block";
+      });
+
+      return card;
+    }
+
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+
+  </script>
+  <!-- 새 구역 직접 만들기 팝업 -->
+  <div id="createZoneModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center; padding:16px; box-sizing:border-box;">
+    <div style="display:block; background:#fff; width:100%; max-width:420px; border-radius:16px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.2); max-height:90vh; overflow-y:auto; box-sizing:border-box;">
+            <h3 style="margin:0 0 14px 0; font-size:18px; color:#1e293b;">➕ 새 구역 카드 직접 만들기</h3>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px; font-weight:bold; color:#475569; display:block; margin-bottom:4px;">구역 분류</label>
+        <select id="czCategory" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; background:#fff; box-sizing:border-box;">
+          <option value="아파트">🏢 아파트</option>
+          <option value="상가">🏪 상가</option>
+          <option value="일반구역" selected>🏘️ 일반구역</option>
+        </select>
+      </div>
+
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <div style="width:90px; flex-shrink:0;">
+          <label style="font-size:12px; font-weight:bold; color:#475569; display:block;">구역번호</label>
+          <input type="text" id="czNum" placeholder="예: 101" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; margin-top:4px; font-size:14px; box-sizing:border-box;">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:12px; font-weight:bold; color:#475569; display:block;">구역명 (필수)</label>
+          <input type="text" id="czName" placeholder="예: 제일풍경채1차 101동" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; margin-top:4px; font-size:14px; box-sizing:border-box;">
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px; font-weight:bold; color:#475569; display:block;">📍 구역 대표 주소 (지도 검색용)</label>
+        <input type="text" id="czAddress" placeholder="예: 경기도 양주시 옥정동로 123 (또는 아파트/건물명)" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; margin-top:4px; font-size:14px; box-sizing:border-box;">
+      </div>
+
+      <div style="background:#f8fafc; padding:12px; border-radius:10px; border:1px solid #e2e8f0; margin-bottom:12px;">
+        <div style="font-size:13px; font-weight:bold; color:#2563eb; margin-bottom:8px;">🏢 아파트 동·층·라인 자동 생성</div>
+        <div style="display:flex; gap:6px; margin-bottom:8px;">
+          <input type="text" id="czDong" placeholder="동 (예: 101동)" style="flex:1; padding:7px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; box-sizing:border-box;">
+          <input type="number" id="czFloorStart" value="1" min="1" style="width:52px; padding:7px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; text-align:center; box-sizing:border-box;">
+          <span style="align-self:center; font-size:12px;">~</span>
+          <input type="number" id="czFloorEnd" placeholder="최고층" min="1" style="width:62px; padding:7px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; text-align:center; box-sizing:border-box;">
+          <span style="align-self:center; font-size:12px;">층</span>
+        </div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input type="number" id="czLineStart" value="1" min="1" style="width:52px; padding:7px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; text-align:center; box-sizing:border-box;">
+          <span style="font-size:12px;">~</span>
+          <input type="number" id="czLineEnd" placeholder="라인수" min="1" style="width:62px; padding:7px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; text-align:center; box-sizing:border-box;">
+          <span style="font-size:12px;">라인</span>
+          <button type="button" onclick="generateAptHouses()" style="margin-left:auto; background:#0ea5e9; color:#fff; border:none; padding:7px 10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap;">호수 자동채우기</button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12px; font-weight:bold; color:#475569; display:block;">생성될 세대(주소) 목록 (한 줄에 하나씩 수정/추가 가능)</label>
+        <textarea id="czHouseList" rows="5" placeholder="직접 입력하거나 위에서 [호수 자동채우기]를 누르세요.&#10;예:&#10;101동 101호&#10;101동 102호" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; margin-top:4px; font-size:13px; line-height:1.4; box-sizing:border-box;"></textarea>
+      </div>
+
+      <div style="display:flex; gap:8px;">
+        <button type="button" onclick="closeCreateZoneModal()" style="flex:1; padding:11px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; font-weight:bold; cursor:pointer;">취소</button>
+        <button type="button" onclick="saveNewZoneDirect()" style="flex:2; padding:11px; border:none; background:#2563eb; color:#fff; border-radius:8px; font-weight:bold; cursor:pointer;">구역 카드 생성하기</button>
+      </div>
+    </div>
+  </div>
+
+
+      <!-- 구역 정보 및 호수 수정/삭제 팝업 -->
+  <div id="editZoneModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center; padding:16px; box-sizing:border-box;">
+    <div style="display:block; background:#fff; width:100%; max-width:420px; border-radius:16px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.2); max-height:90vh; overflow-y:auto; box-sizing:border-box;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h3 style="margin:0; font-size:18px; color:#1e293b;">✏️ 구역 카드 수정</h3>
+        <button type="button" onclick="deleteEntireZone()" style="background:#fee2e2; color:#dc2626; border:none; padding:6px 10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap;">🗑️ 이 구역 삭제</button>
+      </div>
+
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <div style="width:90px; flex-shrink:0;">
+          <label style="font-size:12px; font-weight:bold; color:#475569; display:block;">구역번호</label>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px; font-weight:bold; color:#475569; display:block; margin-bottom:4px;">구역 분류</label>
+        <select id="ezCategory" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; background:#fff; box-sizing:border-box;">
+          <option value="아파트">🏢 아파트</option>
+          <option value="상가">🏪 상가</option>
+          <option value="일반구역">🏘️ 일반구역</option>
+        </select>
+      </div>
+          <input type="text" id="ezNum" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; margin-top:4px; font-size:14px; box-sizing:border-box;">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:12px; font-weight:bold; color:#475569; display:block;">구역명</label>
+          <input type="text" id="ezName" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; margin-top:4px; font-size:14px; box-sizing:border-box;">
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px; font-weight:bold; color:#475569; display:block;">📍 구역 대표 주소 (지도 검색용)</label>
+        <input type="text" id="ezAddress" placeholder="예: 경기도 양주시 옥정동로 123" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; margin-top:4px; font-size:14px; box-sizing:border-box;">
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12px; font-weight:bold; color:#475569; display:block;">세대(호수) 목록 수정 (한 줄에 하나씩 추가·수정·삭제)</label>
+        <div style="font-size:11px; color:#64748b; margin-top:2px;">※ 기존 호수 이름을 그대로 두면 기존의 '만남/부재/메모' 기록이 안전하게 유지됩니다!</div>
+        <textarea id="ezHouseList" rows="7" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; margin-top:6px; font-size:13px; line-height:1.5; box-sizing:border-box;"></textarea>
+      </div>
+
+      <div style="display:flex; gap:8px;">
+        <button type="button" onclick="closeEditZoneModal()" style="flex:1; padding:11px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; font-weight:bold; cursor:pointer;">취소</button>
+        <button type="button" onclick="saveEditedZone()" style="flex:2; padding:11px; border:none; background:#16a34a; color:#fff; border-radius:8px; font-weight:bold; cursor:pointer;">수정 내용 저장</button>
+      </div>
+    </div>
+  </div>
+  <!-- 주차·요일별 반복 인도자 세팅 팝업 -->
+  <div id="leaderModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center; padding:16px; box-sizing:border-box;">
+    <div style="display:block; background:#fff; width:100%; max-width:440px; border-radius:16px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.2); max-height:90vh; overflow-y:auto; box-sizing:border-box;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="margin:0; font-size:18px; color:#1e293b;">🧭 월간 인도자 세팅 (매달 반복)</h3>
+        <button type="button" onclick="closeLeaderModal()" style="background:none; border:none; font-size:20px; cursor:pointer; color:#64748b;">✕</button>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px; font-weight:bold; color:#475569; display:block;">주차 및 요일 선택 — 한 번 세팅하면 매달 같은 주차·요일에 자동 반복됩니다</label>
+        <div style="display:flex; gap:8px; margin-top:4px;">
+          <select id="leaderWeekSelect" onchange="renderLeaderModalContent()" style="flex:1; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; font-weight:bold; background:#fff; box-sizing:border-box;">
+            <option value="1">매월 1주차</option>
+            <option value="2">매월 2주차</option>
+            <option value="3">매월 3주차</option>
+            <option value="4">매월 4주차</option>
+            <option value="5">매월 5주차</option>
+          </select>
+          <select id="leaderDowSelect" onchange="renderLeaderModalContent()" style="flex:1; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; font-weight:bold; background:#fff; box-sizing:border-box;">
+            <option value="1">월요일</option>
+            <option value="2">화요일</option>
+            <option value="3">수요일</option>
+            <option value="4">목요일</option>
+            <option value="5">금요일</option>
+            <option value="6">토요일</option>
+            <option value="0">일요일</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px; font-weight:bold; color:#475569; display:block; margin-bottom:6px;">해당 주차·요일 등록된 인도자 (클릭 시 해제)</label>
+        <div id="selectedLeadersBox" style="min-height:38px; padding:8px; background:#f0fdfa; border:1px solid #99f6e4; border-radius:8px; display:flex; flex-wrap:wrap; gap:6px;"></div>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12px; font-weight:bold; color:#475569; display:block; margin-bottom:6px;">팀원 선택 (클릭하여 인도자 추가)</label>
+        <div id="availableUsersBox" style="max-height:130px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px; padding:8px; display:flex; flex-wrap:wrap; gap:6px;"></div>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-size:12px; font-weight:bold; color:#475569; display:block; margin-bottom:6px;">📋 현재 세팅된 주차·요일별 전체 현황 (클릭 시 수정)</label>
+        <div id="monthlyLeaderSummary" style="max-height:140px; overflow-y:auto; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px; font-size:12px; line-height:1.6;"></div>
+      </div>
+
+      <button type="button" onclick="closeLeaderModal()" style="width:100%; padding:11px; border:none; background:#0d9488; color:#fff; border-radius:8px; font-weight:bold; cursor:pointer;">확인 및 닫기</button>
+    </div>
+  </div>
+  <!-- 공식 게시판 팝업 (일반 공지 섹션 + 장로 전용 섹션) -->
+  <div id="boardModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center; padding:16px; box-sizing:border-box;">
+    <div style="display:block; background:#fff; width:100%; max-width:480px; border-radius:16px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.2); max-height:90vh; overflow-y:auto; box-sizing:border-box;">
+      
+      <!-- 상단 타이틀 -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
+        <h3 style="margin:0; font-size:18px; color:#1e293b;">📋 공식 게시판</h3>
+        <button type="button" onclick="closeBoardModal()" style="background:none; border:none; font-size:20px; cursor:pointer; color:#64748b;">✕</button>
+      </div>
+
+      <!-- ✍️ 글쓰기 영역 ('관리자+장로' 계정에게만 표시됨) -->
+      <div id="boardWriteArea" style="display:none; background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:12px; margin-bottom:16px;">
+        <div style="font-size:13px; font-weight:bold; color:#1e293b; margin-bottom:8px;">✍️ 새 공지 작성 (관리자+장로 전용)</div>
+        <div style="display:flex; gap:6px; margin-bottom:8px;">
+          <select id="boardSectionSelect" style="width:135px; flex-shrink:0; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; font-weight:bold; background:#fff; box-sizing:border-box;">
+            <option value="general">📢 일반 공지</option>
+            <option value="elder">🕊️ 장로 전용</option>
+          </select>
+          <input type="text" id="boardTitleInput" placeholder="제목을 입력하세요" style="flex:1; min-width:0; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; box-sizing:border-box;">
+        </div>
+<div id="boardContentInput" contenteditable="true" style="width:100%; min-height:75px; max-height:250px; overflow-y:auto; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; line-height:1.4; box-sizing:border-box; margin-bottom:8px; background:#fff; white-space:pre-wrap; word-break:break-word;"></div>
+
+        <button type="button" onclick="addBoardPost()" style="width:100%; padding:9px; background:#0284c7; color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer;">게시글 등록하기</button>
+      </div>
+
+      <!-- 1. 📢 일반 공지 섹션 (모든 팀원 열람 가능) -->
+      <div style="margin-bottom:18px;">
+        <div style="font-size:15px; font-weight:bold; color:#0369a1; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+          <span>📢 일반 공지</span>
+          <span style="font-size:11px; color:#64748b; font-weight:normal;">(전체 열람 가능)</span>
+        </div>
+        <div id="generalBoardList" style="display:flex; flex-direction:column; gap:8px;"></div>
+      </div>
+
+      <!-- 2. 🕊️ 장로 전용 섹션 ('장로' 및 '관리자+장로' 계정에게만 보임) -->
+      <div id="elderBoardSection" style="display:none; border-top:2px dashed #cbd5e1; padding-top:14px; margin-bottom:14px;">
+        <div style="font-size:15px; font-weight:bold; color:#7c3aed; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+          <span>🕊️ 장로 전용 게시판</span>
+          <span style="font-size:11px; color:#7c3aed; background:#f3e8ff; padding:2px 6px; border-radius:4px;">장로 권한 전용</span>
+        </div>
+        <div id="elderBoardList" style="display:flex; flex-direction:column; gap:8px;"></div>
+      </div>
+
+      <button type="button" onclick="closeBoardModal()" style="width:100%; padding:11px; border:1px solid #cbd5e1; background:#f8fafc; color:#334155; border-radius:8px; font-weight:bold; cursor:pointer;">닫기</button>
+    </div>
+  </div>
+
+</body>
+</html>
+
+
