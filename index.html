@@ -322,44 +322,91 @@ function openZoneMap(zoneId) {
       window.ZONES_DATA = JSON.parse(localStorage.getItem("zonePctApp_v1")) || [];
     }
     
-const firebaseConfig = {
+    // ==========================================
+    // ★ Firebase 실시간 데이터베이스 연결 (로딩 대기 안전장치 포함)
+    // ==========================================
+    const firebaseConfig = {
       apiKey: "AIzaSyD9Ivlvazp8oRsLPk00L7JIIE5oh0In1BQ",
       authDomain: "://firebaseapp.com",
-      databaseURL: "https://dkcard-41af9-default-rtdb.asia-southeast1.firebasedatabase.app",
+      databaseURL: "https://firebasedatabase.app",
       projectId: "dkcard-41af9",
       storageBucket: "dkcard-41af9.firebasestorage.app",
       messagingSenderId: "177644634319",
       appId: "1:177644634319:web:184e0fb131ffba2e9477ba"
     };
 
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
-    const db = firebase.database();
+    let db = null;
 
-    // 1. 저장 함수 (로컬 백업 + Firebase 서버 동시 전송)
     function saveUsers() {
       localStorage.setItem("zoneCardUsers_v1", JSON.stringify(USERS));
-      db.ref("dkcard/users").set(USERS);
+      if (db) db.ref("dkcard/users").set(USERS);
     }
 
     function saveZones() {
       localStorage.setItem("zonePctApp_v1", JSON.stringify(ZONES_DATA));
-      db.ref("dkcard/zones").set(ZONES_DATA);
+      if (db) db.ref("dkcard/zones").set(ZONES_DATA);
     }
 
-    // 2. 실시간 수신 리스너 (누군가 수정하면 모든 기기 화면 자동 업데이트)
-    db.ref("dkcard/users").on("value", function(snapshot) {
-      const val = snapshot.val();
-      if (val && Array.isArray(val) && val.length > 0) {
-        USERS = val;
-        localStorage.setItem("zoneCardUsers_v1", JSON.stringify(USERS));
-        if (typeof renderUserList === "function") renderUserList();
-      } else if (USERS && USERS.length > 0) {
-        // 서버가 비어있으면 현재 기기의 초기 계정 목록을 서버에 자동 업로드
-        db.ref("dkcard/users").set(USERS);
+    function startFirebaseSync() {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
       }
-    });
+      db = firebase.database();
+
+      db.ref("dkcard/users").on("value", function(snapshot) {
+        const val = snapshot.val();
+        if (val && Array.isArray(val) && val.length > 0) {
+          USERS = val;
+          localStorage.setItem("zoneCardUsers_v1", JSON.stringify(USERS));
+          if (typeof renderUserList === "function") renderUserList();
+        } else if (USERS && USERS.length > 0) {
+          db.ref("dkcard/users").set(USERS);
+        }
+      });
+
+      db.ref("dkcard/zones").on("value", function(snapshot) {
+        const val = snapshot.val();
+        if (val && Array.isArray(val) && val.length > 0) {
+          ZONES_DATA = val.map(function(z) {
+            return Object.assign({ members: [], houses: [] }, z);
+          });
+          localStorage.setItem("zonePctApp_v1", JSON.stringify(ZONES_DATA));
+          if (typeof renderAdminPanel === "function") renderAdminPanel();
+          if (typeof renderLobby === "function") renderLobby();
+          if (typeof renderActiveZone === "function") renderActiveZone();
+        } else if (ZONES_DATA && ZONES_DATA.length > 0) {
+          db.ref("dkcard/zones").set(ZONES_DATA);
+        }
+      });
+
+      db.ref("dkcard/weeklyLeaders").on("value", function(snapshot) {
+        const val = snapshot.val();
+        if (val) {
+          WEEKLY_LEADERS = val;
+          localStorage.setItem("ZONE_WEEKLY_LEADERS", JSON.stringify(WEEKLY_LEADERS));
+          if (typeof renderLeaderModalContent === "function" && document.getElementById("leaderModal")?.style.display === "flex") {
+            renderLeaderModalContent();
+          }
+        }
+      });
+
+      db.ref("dkcard/boardPosts").on("value", function(snapshot) {
+        const val = snapshot.val();
+        if (val && Array.isArray(val)) {
+          BOARD_POSTS = val;
+          localStorage.setItem("ZONE_BOARD_POSTS", JSON.stringify(BOARD_POSTS));
+          if (typeof renderBoardPosts === "function") renderBoardPosts();
+        }
+      });
+    }
+
+    // Firebase 스크립트가 완전히 로드될 때까지 0.05초 간격으로 확인 후 연결
+    const fbWaitTimer = setInterval(function() {
+      if (typeof firebase !== "undefined" && typeof firebase.database === "function") {
+        clearInterval(fbWaitTimer);
+        startFirebaseSync();
+      }
+    }, 50);
 
     db.ref("dkcard/zones").on("value", function(snapshot) {
       const val = snapshot.val();
