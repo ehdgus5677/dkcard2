@@ -325,15 +325,16 @@ function openZoneMap(zoneId) {
     // ==========================================
     // ★ Firebase 실시간 데이터베이스 연결 (로딩 대기 안전장치 포함)
     // ==========================================
-    const firebaseConfig = {
+       const firebaseConfig = {
       apiKey: "AIzaSyD9Ivlvazp8oRsLPk00L7JIIE5oh0In1BQ",
-      authDomain: "://firebaseapp.com",
-      databaseURL: "https://firebasedatabase.app",
+      authDomain: ["dkcard-41af9", "firebaseapp.com"].join("."),
+      databaseURL: "https://" + ["dkcard-41af9-default-rtdb", "asia-southeast1", "firebasedatabase", "app"].join("."),
       projectId: "dkcard-41af9",
-      storageBucket: "dkcard-41af9.firebasestorage.app",
+      storageBucket: ["dkcard-41af9", "firebasestorage.app"].join("."),
       messagingSenderId: "177644634319",
       appId: "1:177644634319:web:184e0fb131ffba2e9477ba"
     };
+
 
     let db = null;
 
@@ -353,18 +354,18 @@ function openZoneMap(zoneId) {
       }
       db = firebase.database();
 
-      db.ref("dkcard/users").on("value", function(snapshot) {
+      if (db) db.ref("dkcard/users").on("value", function(snapshot) {
         const val = snapshot.val();
         if (val && Array.isArray(val) && val.length > 0) {
           USERS = val;
           localStorage.setItem("zoneCardUsers_v1", JSON.stringify(USERS));
           if (typeof renderUserList === "function") renderUserList();
         } else if (USERS && USERS.length > 0) {
-          db.ref("dkcard/users").set(USERS);
+          if (db) db.ref("dkcard/users").set(USERS);
         }
       });
 
-      db.ref("dkcard/zones").on("value", function(snapshot) {
+      if (db) db.ref("dkcard/zones").on("value", function(snapshot) {
         const val = snapshot.val();
         if (val && Array.isArray(val) && val.length > 0) {
           ZONES_DATA = val.map(function(z) {
@@ -375,11 +376,11 @@ function openZoneMap(zoneId) {
           if (typeof renderLobby === "function") renderLobby();
           if (typeof renderActiveZone === "function") renderActiveZone();
         } else if (ZONES_DATA && ZONES_DATA.length > 0) {
-          db.ref("dkcard/zones").set(ZONES_DATA);
+          if (db) db.ref("dkcard/zones").set(ZONES_DATA);
         }
       });
 
-      db.ref("dkcard/weeklyLeaders").on("value", function(snapshot) {
+      if (db) db.ref("dkcard/weeklyLeaders").on("value", function(snapshot) {
         const val = snapshot.val();
         if (val) {
           WEEKLY_LEADERS = val;
@@ -390,7 +391,7 @@ function openZoneMap(zoneId) {
         }
       });
 
-      db.ref("dkcard/boardPosts").on("value", function(snapshot) {
+      if (db) db.ref("dkcard/boardPosts").on("value", function(snapshot) {
         const val = snapshot.val();
         if (val && Array.isArray(val)) {
           BOARD_POSTS = val;
@@ -408,7 +409,7 @@ function openZoneMap(zoneId) {
       }
     }, 50);
 
-    db.ref("dkcard/zones").on("value", function(snapshot) {
+    if (db) db.ref("dkcard/zones").on("value", function(snapshot) {
       const val = snapshot.val();
       if (val && Array.isArray(val) && val.length > 0) {
         // Firebase는 빈 배열([])을 생략할 수 있으므로 members, houses 기본값 안전 복구
@@ -421,7 +422,7 @@ function openZoneMap(zoneId) {
         if (typeof renderActiveZone === "function") renderActiveZone();
       } else if (ZONES_DATA && ZONES_DATA.length > 0) {
         // 서버가 비어있으면 현재 기기의 구역 데이터를 서버에 자동 업로드
-        db.ref("dkcard/zones").set(ZONES_DATA);
+        if (db) db.ref("dkcard/zones").set(ZONES_DATA);
       }
     });
 
@@ -1652,10 +1653,10 @@ function toggleUserRole(idx) {
 
    function saveWeeklyLeaders() {
    localStorage.setItem("ZONE_WEEKLY_LEADERS", JSON.stringify(WEEKLY_LEADERS));
-   db.ref("dkcard/weeklyLeaders").set(WEEKLY_LEADERS);
+   if (db) db.ref("dkcard/weeklyLeaders").set(WEEKLY_LEADERS);
  }
 
- db.ref("dkcard/weeklyLeaders").on("value", function(snapshot) {
+ if (db) db.ref("dkcard/weeklyLeaders").on("value", function(snapshot) {
    const val = snapshot.val();
    if (val) {
      WEEKLY_LEADERS = val;
@@ -1792,10 +1793,10 @@ function toggleUserRole(idx) {
 
    function saveBoardPosts() {
    localStorage.setItem("ZONE_BOARD_POSTS", JSON.stringify(BOARD_POSTS));
-   db.ref("dkcard/boardPosts").set(BOARD_POSTS);
+   if (db) db.ref("dkcard/boardPosts").set(BOARD_POSTS);
  }
 
- db.ref("dkcard/boardPosts").on("value", function(snapshot) {
+ if (db) db.ref("dkcard/boardPosts").on("value", function(snapshot) {
    const val = snapshot.val();
    if (val && Array.isArray(val)) {
      BOARD_POSTS = val;
