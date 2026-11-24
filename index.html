@@ -2096,24 +2096,28 @@ function toggleUserRole(idx) {
         <button type="button" onclick="deleteEntireZone()" style="background:#fee2e2; color:#dc2626; border:none; padding:6px 10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap;">🗑️ 이 구역 삭제</button>
       </div>
 
-      <div style="display:flex; gap:8px; margin-bottom:12px;">
-        <div style="width:90px; flex-shrink:0;">
-          <label style="font-size:12px; font-weight:bold; color:#475569; display:block;">구역번호</label>
-      <div style="margin-bottom:12px;">
-        <label style="font-size:12px; font-weight:bold; color:#475569; display:block; margin-bottom:4px;">구역 분류</label>
-        <select id="ezCategory" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; background:#fff; box-sizing:border-box;">
-          <option value="아파트">🏢 아파트</option>
-          <option value="상가">🏪 상가</option>
-          <option value="일반구역">🏘️ 일반구역</option>
-        </select>
-      </div>
-          <input type="text" id="ezNum" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; margin-top:4px; font-size:14px; box-sizing:border-box;">
+           <!-- 1번째 줄: 구역번호(왼쪽) + 구역 분류(오른쪽) -->
+      <div style="display:flex; gap:10px; margin-bottom:12px;">
+        <div style="width:110px; flex-shrink:0;">
+          <label style="font-size:12px; font-weight:bold; color:#475569; display:block; margin-bottom:4px;">구역번호</label>
+          <input type="text" id="ezNum" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; box-sizing:border-box;">
         </div>
         <div style="flex:1;">
-          <label style="font-size:12px; font-weight:bold; color:#475569; display:block;">구역명</label>
-          <input type="text" id="ezName" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; margin-top:4px; font-size:14px; box-sizing:border-box;">
+          <label style="font-size:12px; font-weight:bold; color:#475569; display:block; margin-bottom:4px;">구역 분류</label>
+          <select id="ezCategory" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; background:#fff; box-sizing:border-box;">
+            <option value="아파트">🏢 아파트</option>
+            <option value="상가">🏪 상가</option>
+            <option value="일반구역">🏘️ 일반구역</option>
+          </select>
         </div>
       </div>
+
+      <!-- 2번째 줄: 구역명 (가로 전체 너비) -->
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px; font-weight:bold; color:#475569; display:block; margin-bottom:4px;">구역명</label>
+        <input type="text" id="ezName" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; box-sizing:border-box;">
+      </div>
+
 
       <div style="margin-bottom:12px;">
         <label style="font-size:12px; font-weight:bold; color:#475569; display:block;">📍 구역 대표 주소 (지도 검색용)</label>
