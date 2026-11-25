@@ -269,15 +269,27 @@
     </div>
   </div>
 
-  <!-- 달력 배정 팝업 -->
+  <!-- 달력 및 개인 배정 팝업 -->
   <div class="modal-overlay" id="calendarModal" onclick="closeCalendarModal()">
     <div class="modal-box" onclick="event.stopPropagation()">
       <h3 id="modalZoneTitle">101구역 배정</h3>
-      <p>이 구역을 오픈할 날짜를 달력에서 선택하세요.</p>
+      <p style="margin-bottom:8px;">📅 <b>모임용 날짜 배정</b> (오픈할 날짜 선택)</p>
       <input type="date" id="modalDateInput" class="modal-date-input">
-      <div class="modal-actions">
-        <button class="btn-modal-cancel" onclick="closeCalendarModal()">취소</button>
-        <button class="btn-modal-confirm" style="background:#6d28d9;" onclick="confirmCalendarAssign()">배정 완료</button>
+      <div class="modal-actions" style="margin-bottom:14px;">
+        <button type="button" class="btn-modal-cancel" onclick="closeCalendarModal()">취소</button>
+        <button type="button" class="btn-modal-confirm" style="background:#6d28d9;" onclick="confirmCalendarAssign()">날짜 배정 완료</button>
+      </div>
+
+      <!-- ★ 개인 전담 배정 섹션 -->
+      <div style="border-top:2px dashed #e2e8f0; padding-top:12px; text-align:left;">
+        <div style="font-size:13px; font-weight:800; color:#0f766e; margin-bottom:6px;">👤 개인 전담 구역 배정</div>
+        <div style="font-size:11px; color:#64748b; margin-bottom:8px;">특정 전도인에게 이 구역을 개인 구역으로 배정합니다.</div>
+        <div style="display:flex; gap:6px;">
+          <select id="modalPersonalUserSelect" style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; background:#fff; box-sizing:border-box;">
+            <option value="">-- 배정할 회원 선택 --</option>
+          </select>
+          <button type="button" onclick="confirmPersonalAssign()" style="background:#0f766e; color:#fff; border:none; padding:8px 12px; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap;">개인 배정</button>
+        </div>
       </div>
     </div>
   </div>
@@ -777,8 +789,8 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
     let adminSearchKeyword = "";
 
     function getZoneCategory(z) {
+      if (z.category === "보류" || z.isHold === true) return "보류";
       if (z.category === "아파트" || z.category === "상가" || z.category === "일반구역") return z.category;
-      // 기존에 분류 없이 등록된 구역은 이름에 '아파트'나 '상가'가 있으면 자동 추정, 없으면 일반구역
       if (z.name && z.name.indexOf("아파트") > -1) return "아파트";
       if (z.name && z.name.indexOf("상가") > -1) return "상가";
       return "일반구역";
@@ -844,10 +856,11 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
 
       // 1단계: 폴더 선택 전 & 검색 중이 아닐 때 -> 큰 폴더 박스 3개 표시
       if (!adminFolderFilter && !isSearching) {
-        const categories = [
+             const categories = [
           { key: "아파트", icon: "🏢", title: "아파트 구역", bg: "#eff6ff", border: "#93c5fd", text: "#1d4ed8" },
           { key: "상가", icon: "🏪", title: "상가 구역", bg: "#f0fdf4", border: "#86efac", text: "#15803d" },
-          { key: "일반구역", icon: "🏘️", title: "일반 구역", bg: "#fefce8", border: "#fde047", text: "#a16207" }
+          { key: "일반구역", icon: "🏘️", title: "일반 구역", bg: "#fefce8", border: "#fde047", text: "#a16207" },
+          { key: "보류", icon: "⏸️", title: "보류 구역 (배정중지)", bg: "#f1f5f9", border: "#cbd5e1", text: "#475569" }
         ];
 
         const folderGrid = document.createElement("div");
@@ -888,7 +901,7 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
 
       let filteredZones = ZONES_DATA.filter(function(z) {
         if (!isSearching && getZoneCategory(z) !== adminFolderFilter) return false;
-        if (adminOnlyUnassigned && (z.assignedDate || z.firstDate)) return false;
+              if (adminOnlyUnassigned && (z.assignedDate || z.firstDate || z.personalAssignee)) return false;
         if (isSearching && z.name.toLowerCase().indexOf(adminSearchKeyword) === -1) return false;
         return true;
       });
@@ -901,25 +914,53 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
         return;
       }
 
-      function buildAdminCard(z) {
+               function buildAdminCard(z) {
         const prog = getZoneProgress(z);
+        const isHold = (getZoneCategory(z) === "보류");
         const isToday = (z.assignedDate === todayStr);
         const card = document.createElement("div");
         card.className = "admin-zone-card" + (isToday ? " assigned-today" : "");
-        card.onclick = function() { openDateModal(z.id); };
+               card.onclick = function() {
+          if (isHold) {
+            alert("⏸️ 현재 '보류 구역(배정중지)' 상태입니다.\n배정을 재개하려면 우측 [✏️ 수정] 버튼에서 구역 분류를 변경해 주세요.");
+            return;
+          }
+          if (z.personalAssignee) {
+            alert("👤 현재 [" + z.personalAssignee + "]님에게 개인 배정된 구역입니다.\n모임 날짜를 배정하려면 먼저 우측 [회수] 버튼을 눌러 개인 배정을 해제해 주세요.");
+            return;
+          }
+          openDateModal(z.id);
+        };
 
-        const d1 = z.firstDate || z.assignedDate || "";
+
+              const d1 = z.firstDate || z.assignedDate || "";
         const d2 = z.secondDate || "";
-        const dateBadge = d1 ? ("📅 1차 : " + d1 + " &nbsp;|&nbsp; 2차 : " + d2) : "미배정 (클릭하여 배정)";
+        let dateBadge = d1 ? ("📅 1차 : " + d1 + " &nbsp;|&nbsp; 2차 : " + d2) : "미배정 (클릭하여 배정)";
+        if (z.personalAssignee) {
+          const pDate = z.personalAssignedDate ? (" (" + z.personalAssignedDate + ")") : "";
+          dateBadge = '<span style="color:#0f766e; font-weight:800;">👤 개인배정: ' + escapeHtml(z.personalAssignee) + pDate + '</span>';
+        }
+        if (isHold) {
+          const holdDateTxt = z.holdDate ? (" &nbsp;|&nbsp; 보류일: " + z.holdDate) : "";
+          dateBadge = '<span style="color:#475569; font-weight:700;">⏸️ 배정 중지' + holdDateTxt + '</span>';
+        }
+
+
+
+        const holdMemoHtml = (isHold && z.holdReason)
+          ? '<div style="margin-top:5px; padding:4px 8px; background:#fef2f2; border:1px solid #fecaca; border-radius:6px; font-size:11px; color:#b91c1c; font-weight:600;">📝 보류 사유: ' + escapeHtml(z.holdReason) + '</div>'
+          : '';
 
         const pctClass = prog.percent === 100 ? "pct-badge done-100" : "pct-badge";
         const barClass = prog.percent === 100 ? "mini-bar-fill done-100" : "mini-bar-fill";
         const editBtn = '<button type="button" onclick="event.stopPropagation(); openEditZoneModal(\'' + z.id + '\')" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:6px 10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; margin-right:4px;">✏️ 수정</button>';
-        const revokeBtn = z.assignedDate ? '<button type="button" class="btn-revoke" onclick="event.stopPropagation(); revokeZoneDate(\'' + z.id + '\')">회수</button>' : '';
+             const revokeBtn = (z.assignedDate || z.firstDate || z.personalAssignee) ? '<button type="button" class="btn-revoke" onclick="event.stopPropagation(); revokeZoneDate(\'' + z.id + '\')">회수</button>' : '';
 
-        card.innerHTML = '<div style="flex:1;"><div style="font-weight:700; font-size:14px; color:#1e293b;">' + z.name + ' <span class="' + pctClass + '">' + prog.percent + '% (' + prog.done + '/' + prog.total + ')</span></div><div style="font-size:12px; color:#64748b; margin-top:4px;">' + dateBadge + '</div><div class="mini-bar-bg"><div class="' + barClass + '" style="width:' + prog.percent + '%;"></div></div></div><div style="display:flex; align-items:center;">' + editBtn + revokeBtn + '</div>';
+
+        card.innerHTML = '<div style="flex:1;"><div style="font-weight:700; font-size:14px; color:#1e293b;">' + z.name + ' <span class="' + pctClass + '">' + prog.percent + '% (' + prog.done + '/' + prog.total + ')</span></div><div style="font-size:12px; color:#64748b; margin-top:4px;">' + dateBadge + '</div>' + holdMemoHtml + '<div class="mini-bar-bg"><div class="' + barClass + '" style="width:' + prog.percent + '%;"></div></div></div><div style="display:flex; align-items:center;">' + editBtn + revokeBtn + '</div>';
         return card;
       }
+
 
       if (adminFolderFilter === "아파트" && !isSearching) {
         const complexGroups = {};
@@ -950,40 +991,60 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
 
 
 
-    function openDateModal(zoneId) {
+     function openDateModal(zoneId) {
       modalTargetZoneId = zoneId;
-      const z = ZONES_DATA.find(item => item.id === zoneId);
+      const z = ZONES_DATA.find(function(item) { return item.id === zoneId; });
       if (!z) return;
 
-      const modal = document.getElementById("dateModal") || document.querySelector(".modal-overlay");
+      const modal = document.getElementById("calendarModal");
       if (!modal) return;
 
-      const titleEl = document.getElementById("modalZoneName") || modal.querySelector("h3") || modal.querySelector("p");
-      if (titleEl) titleEl.innerText = z.name;
+      const titleEl = document.getElementById("modalZoneTitle");
+      if (titleEl) titleEl.innerText = z.name + " 배정";
 
-      const dateInp = document.getElementById("modalDateInput") || modal.querySelector("input[type='date']");
+      const dateInp = document.getElementById("modalDateInput");
       if (dateInp) dateInp.value = z.assignedDate || getTodayString();
+
+      const userSel = document.getElementById("modalPersonalUserSelect");
+      if (userSel) {
+        userSel.innerHTML = '<option value="">-- 배정할 회원 선택 --</option>';
+        if (typeof USERS !== "undefined" && Array.isArray(USERS)) {
+          USERS.forEach(function(u) {
+            if (!u || !u.name) return;
+            const opt = document.createElement("option");
+            opt.value = u.name;
+            opt.textContent = u.name + (u.role ? " (" + u.role + ")" : "");
+            if (z.personalAssignee === u.name) opt.selected = true;
+            userSel.appendChild(opt);
+          });
+        }
+      }
 
       modal.style.display = "flex";
     }
 
     function closeDateModal() {
-      const modal = document.getElementById("dateModal") || document.querySelector(".modal-overlay");
+      const modal = document.getElementById("calendarModal");
       if (modal) modal.style.display = "none";
       modalTargetZoneId = null;
     }
 
-     function getLeaderNamesByDate(dateStr) {
-      if (!dateStr || typeof getWeekDowKey !== "function" || typeof WEEKLY_LEADERS === "undefined") return "";
-      const key = getWeekDowKey(dateStr);
-      const list = WEEKLY_LEADERS[key] || [];
-      return list.join(" ");
-   }
+    function closeCalendarModal() {
+      closeDateModal();
+    }
 
-   function confirmDateAssign() {
-      const z = ZONES_DATA.find(item => item.id === modalTargetZoneId);
-      const modal = document.getElementById("dateModal") || document.querySelector(".modal-overlay");
-      const dateInp = document.getElementById("modalDateInput") || (modal && modal.querySelector("input[type='date']"));
+    function confirmCalendarAssign() {
+      confirmDateAssign();
+    }
+
+    function confirmDateAssign() {
+     const z = ZONES_DATA.find(function(item) { return item.id === modalTargetZoneId; });
+      if (z && z.personalAssignee) {
+        alert("👤 현재 [" + z.personalAssignee + "]님에게 개인 배정된 구역입니다.\n먼저 [회수] 버튼을 눌러 해제한 뒤 날짜를 배정해 주세요.");
+        closeDateModal();
+        return;
+  }  
+      const dateInp = document.getElementById("modalDateInput");
       const newDate = dateInp ? dateInp.value : "";
 
       if (z && newDate) {
@@ -1005,53 +1066,85 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
           }
         }
 
-        // ★ 월간 인도자 세팅표에서 배정 날짜에 맞는 인도자 자동 연결
-        const l1 = getLeaderNamesByDate(z.firstDate);
-        const l2 = getLeaderNamesByDate(z.secondDate);
+        z.personalAssignee = "";
+        z.personalAssignedDate = "";
+
+        const l1 = (typeof getLeaderNamesByDate === "function") ? getLeaderNamesByDate(z.firstDate) : "";
+        const l2 = (typeof getLeaderNamesByDate === "function") ? getLeaderNamesByDate(z.secondDate) : "";
         z.firstLeader = l1;
         z.secondLeader = l2;
-        if (l1 && l2) {
-          z.assignedLeader = "1차:" + l1 + " / 2차:" + l2;
-        } else {
-          z.assignedLeader = l1 || l2 || "";
-        }
+        z.assignedLeader = (l1 && l2) ? ("1차:" + l1 + " / 2차:" + l2) : (l1 || l2 || "");
 
+        closeDateModal();
         saveZones();
-        renderAdminPanel();
-        renderLobby();
-        renderActiveZone();
+        if (typeof renderAdminPanel === "function") renderAdminPanel();
+        if (typeof renderLobby === "function") renderLobby();
+        if (typeof renderActiveZone === "function") renderActiveZone();
+      } else {
+        closeDateModal();
       }
-      closeDateModal();
-   }
-
-
-
-    function revokeZoneDate(zoneId) {
-      const z = ZONES_DATA.find(item => item.id === zoneId);
-      if (!z) return;
-      if (!confirm("'" + z.name + "' 구역의 현재 배정을 회수할까요?")) return;
-      z.assignedDate = "";
-      saveZones();
-      renderAdminPanel();
-      renderLobby();
-      renderActiveZone();
-      closeDateModal();
     }
-  function confirmCalendarAssign() { confirmDateAssign(); }
+
+    function confirmPersonalAssign() {
+      const z = ZONES_DATA.find(function(item) { return item.id === modalTargetZoneId; });
+      const userSel = document.getElementById("modalPersonalUserSelect");
+      const targetName = userSel ? userSel.value.trim() : "";
+
+      if (!z) {
+        closeDateModal();
+        return;
+      }
+      if (!targetName) {
+        alert("개인 배정할 회원을 먼저 선택해 주세요.");
+        return;
+      }
+
+      z.personalAssignee = targetName;
+      z.personalAssignedDate = getTodayString();
+      z.assignedDate = "";
+      z.firstDate = "";
+      z.secondDate = "";
+      z.members = [];
+
+      closeDateModal();
+      saveZones();
+      if (typeof renderAdminPanel === "function") renderAdminPanel();
+      if (typeof renderLobby === "function") renderLobby();
+      if (typeof renderActiveZone === "function") renderActiveZone();
+
+      alert("'" + z.name + "' 구역이 [" + targetName + "]님에게 개인 구역으로 배정되었습니다.");
+    }
+
+
+
+
+
+      function confirmCalendarAssign() { confirmDateAssign(); }
     function closeCalendarModal() { closeDateModal(); }
 
-
-    function revokeZoneDate(zoneId) {
+        function revokeZoneDate(zoneId) {
       const z = ZONES_DATA.find(item => item.id === zoneId);
       if (!z) return;
+      const msg = z.personalAssignee
+        ? ("'" + z.name + "' 구역의 [" + z.personalAssignee + "]님 개인 배정을 회수할까요?")
+        : ("'" + z.name + "' 구역의 날짜 배정을 회수할까요?");
+      if (!confirm(msg)) return;
+
       z.assignedDate = "";
+      z.firstDate = "";
+      z.secondDate = "";
+      z.personalAssignee = "";
+      z.personalAssignedDate = "";
       z.members = [];
       if (selectedZoneId === zoneId) selectedZoneId = null;
+
       saveZones();
       renderAdminPanel();
       renderLobby();
       renderActiveZone();
     }
+
+
     function kickMember(zoneId, memberName) {
       if (!currentUser || currentUser.role !== "관리자") return;
       const z = ZONES_DATA.find(item => item.id === zoneId);
@@ -1063,82 +1156,7 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
       renderLobby();
       renderActiveZone();
     }
-     function renderLobby() {
-      const lobbyList = document.getElementById("lobbyList");
-      if (!lobbyList) return;
-      lobbyList.innerHTML = "";
-      const todayStr = getTodayString();
-	const todayZones = ZONES_DATA.filter(z => z.assignedDate === todayStr || z.firstDate === todayStr || z.secondDate === todayStr);
-
-
-      const isAdmin = (isAdminUser(currentUser));
-
-      if (todayZones.length === 0) {
-        lobbyList.innerHTML = '<div style="background:#fff; padding:24px; border-radius:14px; text-align:center; color:#64748b; font-size:14px;">오늘(' + todayStr + ') 배정된 구역이 아직 없습니다.</div>';
-        return;
-      }
-
-      todayZones.forEach(function(z) {
-        const prog = getZoneProgress(z);
-        const isJoined = z.members.includes(currentUser.name);
-        const isFull = z.members.length >= 6;
-        const pctClass = prog.percent === 100 ? "pct-badge done-100" : "pct-badge";
-        const barClass = prog.percent === 100 ? "mini-bar-fill done-100" : "mini-bar-fill";
-
-        const card = document.createElement("div");
-        card.className = "lobby-card" + (isJoined ? " joined" : "");
-        card.onclick = function() {
-          if (isJoined || isAdmin) {
-            selectedZoneId = z.id;
-            renderActiveZone();
-          } else {
-            alert("먼저 '참여하기' 버튼을 눌러 구역에 참여해 주세요.");
-          }
-        };
-
-        let btnHtml = "";
-        if (isJoined) {
-          btnHtml = '<button type="button" class="btn-join leave" onclick="event.stopPropagation(); toggleJoinZone(\'' + z.id + '\')">나가기</button>';
-        } else if (isFull) {
-          btnHtml = '<button type="button" class="btn-join full" disabled>마감 (6/6)</button>';
-        } else {
-          btnHtml = '<button type="button" class="btn-join enter" onclick="event.stopPropagation(); toggleJoinZone(\'' + z.id + '\')">참여하기</button>';
-        }
-
-        let membersHtml = "없음";
-        if (z.members.length > 0) {
-          if (isAdmin) {
-            membersHtml = z.members.map(function(m) {
-              return '<span style="display:inline-flex; align-items:center; gap:3px; background:#f1f5f9; padding:2px 6px; border-radius:6px; margin:2px 2px 0 0; font-weight:600; color:#334155;">' + m + ' <button type="button" onclick="event.stopPropagation(); kickMember(\'' + z.id + '\', \'' + m + '\')" title="명단에서 제외" style="background:#fee2e2; color:#dc2626; border:none; border-radius:4px; padding:0 4px; font-size:11px; font-weight:bold; cursor:pointer;">✕</button></span>';
-            }).join("");
-          } else {
-            membersHtml = z.members.join(", ");
-          }
-        }
-
-        // 1차/2차 배정일 및 최종 체크 담당자 표시 배지
-        const d1 = z.firstDate || z.assignedDate || "-";
-        const d2 = z.secondDate || "미배정";
-        const lastChk = z.lastCheckedBy ? z.lastCheckedBy : "없음";
-        const metaHtml = '<div style="font-size:11px; color:#475569; background:#f8fafc; padding:5px 8px; border-radius:6px; margin-top:6px; border:1px solid #e2e8f0; line-height:1.5;">📅 <b>1차:</b> ' + d1 + ' &nbsp;|&nbsp; <b>2차:</b> ' + d2 + '<br>✍️ <b>최종 체크:</b> ' + lastChk + '</div>';
-
-        card.innerHTML = '<div class="lobby-info"><h3>' + z.name + ' <span class="' + pctClass + '">' + prog.percent + '%</span></h3><div class="lobby-sub">참여 인원 (' + z.members.length + '/6명): ' + membersHtml + '</div>' + metaHtml + '<div class="mini-bar-bg"><div class="' + barClass + '" style="width:' + prog.percent + '%;"></div></div></div>' + btnHtml;
-        lobbyList.appendChild(card);
-      });
-    }
-
-    function kickMember(zoneId, memberName) {
-      if (!currentUser || currentUser.role !== "관리자") return;
-      const z = ZONES_DATA.find(item => item.id === zoneId);
-      if (!z) return;
-      if (!confirm("[관리자 권한] '" + z.name + "' 참여 명단에서 '" + memberName + "'님을 제외할까요?")) return;
-
-      z.members = z.members.filter(m => m !== memberName);
-      saveZones();
-      renderLobby();
-      renderActiveZone();
-    }
-    function renderLobby() {
+            function renderLobby() {
       const lobbyList = document.getElementById("lobbyList");
       if (!lobbyList) return;
       lobbyList.innerHTML = "";
@@ -1147,7 +1165,40 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
 
       const isAdmin = (isAdminUser(currentUser));
 
-      if (todayZones.length === 0) {
+      // ★ 1. 로그인한 사용자에게 '개인 배정'된 구역이 있으면 최상단에 전용 카드로 표시
+      const myPersonalZones = ZONES_DATA.filter(function(z) {
+        return currentUser && z.personalAssignee === currentUser.name && getZoneCategory(z) !== "보류";
+      });
+
+      if (myPersonalZones.length > 0) {
+        const pHeader = document.createElement("div");
+        pHeader.style.cssText = "font-size:13px; font-weight:800; color:#0f766e; background:#f0fdfa; border:1px solid #99f6e4; padding:7px 12px; border-radius:8px; margin-bottom:8px;";
+        pHeader.innerText = "👤 " + currentUser.name + "님의 개인 전담 배정 구역 (" + myPersonalZones.length + "개)";
+        lobbyList.appendChild(pHeader);
+
+        myPersonalZones.forEach(function(z) {
+          const prog = getZoneProgress(z);
+          const pctClass = prog.percent === 100 ? "pct-badge done-100" : "pct-badge";
+          const barClass = prog.percent === 100 ? "mini-bar-fill done-100" : "mini-bar-fill";
+
+          const card = document.createElement("div");
+          card.className = "lobby-card joined";
+          card.style.border = "2px solid #14b8a6";
+          card.onclick = function() {
+            selectedZoneId = z.id;
+            renderActiveZone();
+          };
+
+          const pDate = z.personalAssignedDate || "-";
+          const btnHtml = '<button type="button" class="btn-join enter" style="background:#0f766e;" onclick="event.stopPropagation(); selectedZoneId=\'' + z.id + '\'; renderActiveZone();">열기 ➔</button>';
+
+          card.innerHTML = '<div class="lobby-info"><h3>' + z.name + ' <button type="button" onclick="event.stopPropagation(); openZoneMap(\'' + z.id + '\')" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:600; margin-left:6px; cursor:pointer;">📍 지도보기</button> <span class="' + pctClass + '">' + prog.percent + '%</span></h3><div class="lobby-sub" style="color:#0f766e; font-weight:600;">👤 개인 전담 구역 (배정일: ' + pDate + ')</div><div class="mini-bar-bg"><div class="' + barClass + '" style="width:' + prog.percent + '%;"></div></div></div>' + btnHtml;
+          lobbyList.appendChild(card);
+        });
+      }
+
+      // ★ 2. 오늘 모임 배정 구역과 개인 배정 구역이 모두 없을 때만 빈 화면 안내 표시
+      if (todayZones.length === 0 && myPersonalZones.length === 0) {
         lobbyList.innerHTML = '<div style="background:#fff; padding:24px; border-radius:14px; text-align:center; color:#64748b; font-size:14px;">오늘(' + todayStr + ') 배정된 구역이 아직 없습니다.</div>';
         return;
       }
@@ -1190,7 +1241,7 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
           }
         }
 
-             card.innerHTML = '<div class="lobby-info"><h3>' + z.name + ' <button type="button" onclick="event.stopPropagation(); openZoneMap(\'' + z.id + '\')" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:600; margin-left:6px; cursor:pointer;">📍 지도보기</button> <span class="' + pctClass + '">' + prog.percent + '%</span></h3><div class="lobby-sub">참여 인원 (' + z.members.length + '/6명): ' + membersHtml + '</div><div class="mini-bar-bg"><div class="' + barClass + '" style="width:' + prog.percent + '%;"></div></div></div>' + btnHtml;
+        card.innerHTML = '<div class="lobby-info"><h3>' + z.name + ' <button type="button" onclick="event.stopPropagation(); openZoneMap(\'' + z.id + '\')" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:600; margin-left:6px; cursor:pointer;">📍 지도보기</button> <span class="' + pctClass + '">' + prog.percent + '%</span></h3><div class="lobby-sub">참여 인원 (' + z.members.length + '/6명): ' + membersHtml + '</div><div class="mini-bar-bg"><div class="' + barClass + '" style="width:' + prog.percent + '%;"></div></div></div>' + btnHtml;
         lobbyList.appendChild(card);
       });
     }
@@ -1443,7 +1494,15 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
 
     let editTargetZoneId = null;
 
-   function openEditZoneModal(zoneId) {
+     function toggleHoldReasonBox() {
+      const ezCat = document.getElementById("ezCategory");
+      const wrap = document.getElementById("ezHoldReasonWrap");
+      if (ezCat && wrap) {
+        wrap.style.display = (ezCat.value === "보류") ? "block" : "none";
+      }
+    }
+
+    function openEditZoneModal(zoneId) {
       if (!isAdminUser(currentUser)) return;
       const z = ZONES_DATA.find(function(item) { return item.id === zoneId; });
       if (!z) return;
@@ -1451,6 +1510,10 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
       editTargetZoneId = zoneId;
       const ezCat = document.getElementById("ezCategory");
       if (ezCat) ezCat.value = getZoneCategory(z);
+      const ezHold = document.getElementById("ezHoldReason");
+      if (ezHold) ezHold.value = z.holdReason || "";
+      toggleHoldReasonBox();
+
       document.getElementById("ezNum").value = z.zoneNum || "";
       document.getElementById("ezName").value = z.rawZoneName || z.name.replace(/^\[.*?\]\s*/, "");
       document.getElementById("ezAddress").value = z.address || "";
@@ -1472,14 +1535,29 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
 
       if (!newName) return alert("구역명을 입력해 주세요.");
       if (rawLines.length === 0) return alert("최소 1개 이상의 세대(주소)가 있어야 합니다. 구역 자체를 지우려면 상단의 [🗑️ 이 구역 삭제]를 눌러주세요.");
+
       const ezCat = document.getElementById("ezCategory");
       if (ezCat) z.category = ezCat.value;
+
+          const ezHold = document.getElementById("ezHoldReason");
+      if (z.category === "보류") {
+        z.holdReason = ezHold ? ezHold.value.trim() : "";
+        if (!z.holdDate) z.holdDate = getTodayString();
+        z.assignedDate = "";
+        z.firstDate = "";
+        z.secondDate = "";
+        z.members = [];
+      } else {
+        z.holdReason = "";
+        z.holdDate = "";
+      }
+
+
       z.zoneNum = newNum;
       z.rawZoneName = newName;
       z.name = newNum ? ("[" + newNum + "] " + newName) : newName;
       z.address = document.getElementById("ezAddress").value.trim();
 
-      // 기존 세대의 상태/메모는 보존하면서 새 목록으로 재구성
       let idCounter = Date.now();
       const oldHouses = z.houses.slice();
       z.houses = rawLines.map(function(addr) {
@@ -1506,6 +1584,7 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
       closeEditZoneModal();
       alert("구역 정보가 수정되었습니다!");
     }
+
 
     function deleteEntireZone() {
       const z = ZONES_DATA.find(function(item) { return item.id === editTargetZoneId; });
@@ -2104,13 +2183,21 @@ function toggleUserRole(idx) {
         </div>
         <div style="flex:1;">
           <label style="font-size:12px; font-weight:bold; color:#475569; display:block; margin-bottom:4px;">구역 분류</label>
-          <select id="ezCategory" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; background:#fff; box-sizing:border-box;">
+                         <select id="ezCategory" onchange="toggleHoldReasonBox()" style="width:100%; padding:9px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; background:#fff; box-sizing:border-box;">
             <option value="아파트">🏢 아파트</option>
             <option value="상가">🏪 상가</option>
             <option value="일반구역">🏘️ 일반구역</option>
+            <option value="보류">⏸️ 보류 구역</option>
           </select>
         </div>
       </div>
+
+      <!-- ★ 보류 구역 선택 시에만 자동으로 나타나는 보류 사유 메모 입력칸 -->
+      <div id="ezHoldReasonWrap" style="display:none; margin-bottom:12px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:10px;">
+        <label style="font-size:12px; font-weight:bold; color:#475569; display:block; margin-bottom:4px;">⏸️ 보류 사유 메모 (선택)</label>
+        <input type="text" id="ezHoldReason" placeholder="예: 아파트 재건축 공사중, 상가 리모델링 등" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; box-sizing:border-box; background:#fff;">
+      </div>
+
 
       <!-- 2번째 줄: 구역명 (가로 전체 너비) -->
       <div style="margin-bottom:12px;">
