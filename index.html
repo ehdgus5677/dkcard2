@@ -824,8 +824,35 @@ if (isAdminUser(target) && USERS.filter(u => isAdminUser(u)).length <= 1) {
       }
       return false;
     }
+    
+function getLeaderNamesByDate(dateStr) {
+      if (!dateStr) return "";
+      const target = String(dateStr).trim();
 
-      function exportCurrentDataToExcel() {
+      // 1. 날짜별 인도자 배정 데이터(예: MONTHLY_LEADERS, LEADER_SCHEDULE 등)가 있는 경우
+      const leaderMap = window.MONTHLY_LEADERS || window.LEADER_SCHEDULE || window.dailyLeaders || (typeof MONTHLY_LEADERS !== "undefined" ? MONTHLY_LEADERS : null);
+      if (leaderMap && leaderMap[target]) {
+        const val = leaderMap[target];
+        return Array.isArray(val) ? val.join(", ") : String(val);
+      }
+
+      // 2. 요일별(일~토) 고정 인도자 세팅(예: WEEKLY_LEADERS 등)을 사용하는 경우
+      const parsed = new Date(target);
+      if (!isNaN(parsed.getTime())) {
+        const dayIdx = parsed.getDay(); // 0(일) ~ 6(토)
+        const weeklyMap = window.WEEKLY_LEADERS || (typeof WEEKLY_LEADERS !== "undefined" ? WEEKLY_LEADERS : null);
+        if (weeklyMap && weeklyMap[dayIdx]) {
+          const val = weeklyMap[dayIdx];
+          return Array.isArray(val) ? val.join(", ") : String(val);
+        }
+      }
+
+      return "";
+    }
+
+      
+
+function exportCurrentDataToExcel() {
           let csv = "\uFEFF구역번호,구역명,구역대표주소,진행률,1차배정일,2차배정일,인도자\n";
 
       ZONES_DATA.forEach(function(z) {
@@ -1408,7 +1435,8 @@ if (isAdminUser(target) && USERS.filter(u => isAdminUser(u)).length <= 1) {
           const pDate = z.personalAssignedDate || "-";
           const btnHtml = '<button type="button" class="btn-join enter" style="background:#0f766e;" onclick="event.stopPropagation(); selectedZoneId=\'' + z.id + '\'; renderActiveZone();">열기 ➔</button>';
 
-          card.innerHTML = '<div class="lobby-info"><h3>' + z.name + ' <button type="button" onclick="event.stopPropagation(); openZoneMap(\'' + z.id + '\')" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:600; margin-left:6px; cursor:pointer;">📍 지도보기</button> <span class="' + pctClass + '">' + prog.percent + '%</span></h3><div class="lobby-sub" style="color:#0f766e; font-weight:600;">👤 개인 전담 구역 (배정일: ' + pDate + ')</div><div class="mini-bar-bg"><div class="' + barClass + '" style="width:' + prog.percent + '%;"></div></div></div>' + btnHtml;
+                 card.innerHTML = '<div class="lobby-info"><h3>' + z.name + ' <button type="button" onclick="event.stopPropagation(); openZoneMap(\'' + z.id + '\')" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:600; margin-left:6px; cursor:pointer;">📍 지도보기</button> <span class="pct-badge">' + prog.percent + '% (' + prog.done + '/' + prog.total + ')</span></h3><div class="lobby-sub" style="color:#0f766e; font-weight:600;">👤 개인 전담 구역 (배정일: ' + pDate + ')</div><div class="mini-bar-bg"><div class="' + barClass + '" style="width:' + prog.percent + '%;"></div></div></div>' + btnHtml;
+
           lobbyList.appendChild(card);
         });
       }
@@ -1457,7 +1485,8 @@ if (isAdminUser(target) && USERS.filter(u => isAdminUser(u)).length <= 1) {
           }
         }
 
-        card.innerHTML = '<div class="lobby-info"><h3>' + z.name + ' <button type="button" onclick="event.stopPropagation(); openZoneMap(\'' + z.id + '\')" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:600; margin-left:6px; cursor:pointer;">📍 지도보기</button> <span class="' + pctClass + '">' + prog.percent + '%</span></h3><div class="lobby-sub">참여 인원 (' + z.members.length + '/6명): ' + membersHtml + '</div><div class="mini-bar-bg"><div class="' + barClass + '" style="width:' + prog.percent + '%;"></div></div></div>' + btnHtml;
+                card.innerHTML = '<div class="lobby-info"><h3>' + z.name + ' <button type="button" onclick="event.stopPropagation(); openZoneMap(\'' + z.id + '\')" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:6px; padding:2px 8px; font-size:11px; font-weight:600; margin-left:6px; cursor:pointer;">📍 지도보기</button> <span class="' + pctClass + '">' + prog.percent + '% (' + prog.done + '/' + prog.total + ')</span></h3><div class="lobby-sub">참여 인원 (' + z.members.length + '/6명): ' + membersHtml + '</div><div class="mini-bar-bg"><div class="' + barClass + '" style="width:' + prog.percent + '%;"></div></div></div>' + btnHtml;
+
         lobbyList.appendChild(card);
       });
     }
