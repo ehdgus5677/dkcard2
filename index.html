@@ -889,15 +889,29 @@ if (isAdminUser(target) && USERS.filter(u => isAdminUser(u)).length <= 1) {
       renderAdminZoneBody();
     }
 
-    function updateBulkDeleteBtn() {
+     function updateBulkDeleteBtn() {
       const checked = document.querySelectorAll(".zone-bulk-chk:checked");
-      const btn = document.getElementById("btnBulkDeleteZones");
-      if (!btn) return;
+      const btnDel = document.getElementById("btnBulkDeleteZones");
+      const btnHold = document.getElementById("btnBulkHoldZones");
+      const btnRestore = document.getElementById("btnBulkRestoreZones");
+
       if (checked.length > 0) {
-        btn.style.display = "inline-block";
-        btn.innerText = "🗑️ 선택 삭제 (" + checked.length + ")";
+        if (btnDel) {
+          btnDel.style.display = "inline-block";
+          btnDel.innerText = "🗑️ 선택 삭제 (" + checked.length + ")";
+        }
+        if (btnHold) {
+          btnHold.style.display = "inline-block";
+          btnHold.innerText = "⏸️ 선택 보류 (" + checked.length + ")";
+        }
+        if (btnRestore) {
+          btnRestore.style.display = "inline-block";
+          btnRestore.innerText = "▶️ 선택 복구 (" + checked.length + ")";
+        }
       } else {
-        btn.style.display = "none";
+        if (btnDel) btnDel.style.display = "none";
+        if (btnHold) btnHold.style.display = "none";
+        if (btnRestore) btnRestore.style.display = "none";
       }
     }
 
@@ -907,6 +921,7 @@ if (isAdminUser(target) && USERS.filter(u => isAdminUser(u)).length <= 1) {
       });
       updateBulkDeleteBtn();
     }
+
 
       function deleteSelectedZones() {
       const checked = Array.from(document.querySelectorAll(".zone-bulk-chk:checked"));
@@ -936,7 +951,74 @@ if (isAdminUser(target) && USERS.filter(u => isAdminUser(u)).length <= 1) {
       if (typeof renderActiveZone === "function") renderActiveZone();
       alert(removedCount + "개의 구역 카드가 일괄 삭제되었습니다!");
     }
+// ★ 선택한 구역 카드 일괄 보류 이동 함수
+    function holdSelectedZones() {
+      const checked = Array.from(document.querySelectorAll(".zone-bulk-chk:checked"));
+      if (checked.length === 0) return;
 
+      const reason = prompt("선택한 " + checked.length + "개의 구역 카드를 일괄 보류 처리합니다.\n보류 사유를 입력해 주세요 (예: 재건축, 출입통제 등):", "일괄 보류");
+      if (reason === null) return;
+
+      const today = new Date().toISOString().slice(0, 10);
+      const targetIds = checked.map(function(cb) { return String(cb.value).trim(); });
+      let holdCount = 0;
+
+      for (let i = 0; i < ZONES_DATA.length; i++) {
+        const currentId = String(ZONES_DATA[i].id).trim();
+        if (targetIds.indexOf(currentId) > -1) {
+          ZONES_DATA[i].isHold = true;
+          ZONES_DATA[i].status = "hold";
+         ZONES_DATA[i].category = "보류";
+          ZONES_DATA[i].holdReason = reason.trim() || "일괄 보류";
+          ZONES_DATA[i].holdDate = today;
+          holdCount++;
+        }
+      }
+
+      if (window.ZONES_DATA && window.ZONES_DATA !== ZONES_DATA) {
+        window.ZONES_DATA = ZONES_DATA;
+      }
+
+      saveZones();
+      renderAdminPanel();
+      renderLobby();
+      if (typeof renderActiveZone === "function") renderActiveZone();
+      alert(holdCount + "개의 구역 카드가 보류 목록으로 일괄 이동되었습니다!");
+    }
+
+    function restoreSelectedZones() {
+      const checked = Array.from(document.querySelectorAll(".zone-bulk-chk:checked"));
+      if (checked.length === 0) return;
+
+      if (!confirm("선택한 " + checked.length + "개의 구역 카드를 보류 해제하고 정상 구역으로 복구할까요?")) return;
+
+      const targetIds = checked.map(function(cb) { return String(cb.value).trim(); });
+      let restoreCount = 0;
+
+      for (let i = 0; i < ZONES_DATA.length; i++) {
+        const currentId = String(ZONES_DATA[i].id).trim();
+        if (targetIds.indexOf(currentId) > -1) {
+          ZONES_DATA[i].isHold = false;
+          ZONES_DATA[i].status = "active";
+          if (ZONES_DATA[i].category === "보류") {
+            ZONES_DATA[i].category = "";
+          }
+          ZONES_DATA[i].holdReason = "";
+          ZONES_DATA[i].holdDate = "";
+          restoreCount++;
+        }
+      }
+
+      if (window.ZONES_DATA && window.ZONES_DATA !== ZONES_DATA) {
+        window.ZONES_DATA = ZONES_DATA;
+      }
+
+      saveZones();
+      renderAdminPanel();
+      renderLobby();
+      if (typeof renderActiveZone === "function") renderActiveZone();
+      alert(restoreCount + "개의 구역 카드가 정상 구역으로 일괄 복구되었습니다!");
+    }
 
     function renderAdminPanel() {
       const panel = document.getElementById("adminPanel") || document.querySelector(".control-panel");
@@ -1031,7 +1113,10 @@ if (isAdminUser(target) && USERS.filter(u => isAdminUser(u)).length <= 1) {
             '<input type="checkbox" id="adminSelectAllChk" onchange="toggleSelectAllVisibleZones(this.checked)" style="width:14px; height:14px; cursor:pointer;"> 전체선택' +
           '</label>' +
           '<button type="button" id="btnBulkDeleteZones" onclick="deleteSelectedZones()" style="display:none; background:#dc2626; color:#fff; border:none; padding:5px 10px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">🗑️ 선택 삭제 (0)</button>' +
-        '</div>';
+        '<button type="button" id="btnBulkHoldZones" onclick="holdSelectedZones()" style="display:none; background:#f59e0b; color:#fff; border:none; padding:5px 10px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">⏸️ 선택 보류 (0)</button>' +
+        '<button type="button" id="btnBulkRestoreZones" onclick="restoreSelectedZones()" style="display:none; background:#10b981; color:#fff; border:none; padding:5px 10px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">▶️ 선택 복구 (0)</button>' +
+      '</div>';
+
       body.appendChild(navHeader);
 
       let filteredZones = ZONES_DATA.filter(function(z) {
