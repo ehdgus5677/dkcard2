@@ -227,11 +227,28 @@
       <div class="panel-guide">💡 아래 <strong>구역 카드를 터치</strong>하면 달력이 열려 날짜를 바로 배정할 수 있습니다.</div>
 
                  <div style="display:flex; flex-direction:column; gap:8px; margin:14px 0 16px 0;">
-        <!-- 1행: 구역·엑셀 데이터 관리 (3등분) -->
-        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
+        <!-- 1행: 구역·엑셀 데이터 관리 (2x2 깔끔한 정렬) -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
           <button type="button" onclick="downloadSampleExcel()" style="width:100%; height:40px; background:#f8fafc; color:#334155; border:1px solid #cbd5e1; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; box-sizing:border-box; white-space:nowrap;">📄 샘플 양식</button>
           <button type="button" onclick="document.getElementById('excelFileInput').click()" style="width:100%; height:40px; background:#7c3aed; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; box-sizing:border-box; white-space:nowrap;">📤 엑셀 업로드</button>
+          <button type="button" onclick="openPasteExcelModal()" style="width:100%; height:40px; background:#0284c7; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; box-sizing:border-box; white-space:nowrap;">📋 엑셀 붙여넣기 추가</button>
           <button type="button" onclick="exportCurrentDataToExcel()" style="width:100%; height:40px; background:#15803d; color:#fff; border:none; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; box-sizing:border-box; white-space:nowrap;">💾 결과 백업</button>
+        </div>
+
+        <!-- ★ 엑셀 복사·붙여넣기 전용 팝업 -->
+        <div id="pasteExcelModal" onclick="closePasteExcelModal()" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:9999; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;">
+          <div onclick="event.stopPropagation()" style="background:#fff; width:100%; max-width:520px; border-radius:16px; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.2); box-sizing:border-box;">
+            <h3 style="margin:0 0 8px 0; font-size:17px; color:#1e293b;">📋 엑셀 데이터 붙여넣기 (추가 등록)</h3>
+            <p style="margin:0 0 10px 0; font-size:12px; color:#475569; line-height:1.5;">
+              엑셀에서 첫 줄 제목(<b>분류, 구역번호, 구역명, 주소, 동, 호수</b> 등)을 포함해 영역을 드래그하여 복사(<b>Ctrl+C</b>)한 뒤, 아래 칸에 붙여넣기(<b>Ctrl+V</b>) 하세요.<br>
+              <span style="color:#0284c7; font-weight:bold;">※ 기존 구역 카드는 유지되고 새 데이터가 뒤에 추가됩니다.</span>
+            </p>
+            <textarea id="pasteExcelTextarea" rows="10" placeholder="여기에 엑셀에서 복사한 표를 붙여넣으세요..." style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:12px; font-family:monospace; box-sizing:border-box; resize:vertical;"></textarea>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+              <button type="button" onclick="closePasteExcelModal()" style="flex:1; height:42px; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:bold; cursor:pointer;">취소</button>
+              <button type="button" onclick="processPastedExcel()" style="flex:1.5; height:42px; background:#0284c7; color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:bold; cursor:pointer;">➕ 기존 목록에 추가하기</button>
+            </div>
+          </div>
         </div>
 
         <!-- 2행: 운영 설정 및 초기화 (2등분) -->
@@ -370,9 +387,17 @@ function openZoneMap(zoneId) {
       if (db) db.ref("dkcard/users").set(USERS);
     }
 
-    function saveZones() {
-      localStorage.setItem("zonePctApp_v1", JSON.stringify(ZONES_DATA));
-      if (db) db.ref("dkcard/zones").set(ZONES_DATA);
+      function saveZones() {
+      const targetList = Array.isArray(ZONES_DATA) ? ZONES_DATA : (window.ZONES_DATA || []);
+      window.ZONES_DATA = targetList;
+      localStorage.setItem("zonePctApp_v1", JSON.stringify(targetList));
+      if (db) {
+        if (targetList.length === 0) {
+          db.ref("dkcard/zones").set("__EMPTY__");
+        } else {
+          db.ref("dkcard/zones").set(targetList);
+        }
+      }
     }
 
     function startFirebaseSync() {
@@ -394,7 +419,13 @@ function openZoneMap(zoneId) {
 
       if (db) db.ref("dkcard/zones").on("value", function(snapshot) {
         const val = snapshot.val();
-        if (val && Array.isArray(val) && val.length > 0) {
+        if (val === "__EMPTY__") {
+          ZONES_DATA = [];
+          localStorage.setItem("zonePctApp_v1", JSON.stringify(ZONES_DATA));
+          if (typeof renderAdminPanel === "function") renderAdminPanel();
+          if (typeof renderLobby === "function") renderLobby();
+          if (typeof renderActiveZone === "function") renderActiveZone();
+        } else if (val && Array.isArray(val) && val.length > 0) {
           ZONES_DATA = val.map(function(z) {
             return Object.assign({ members: [], houses: [] }, z);
           });
@@ -633,18 +664,44 @@ if (isAdminUser(target) && USERS.filter(u => isAdminUser(u)).length <= 1) {
       document.getElementById("loginView").style.display = "flex";
       document.getElementById("userPin").value = "";
     }
-  function downloadSampleExcel() {
-      const csvContent = "\uFEFF" +
-        "분류,구역번호,구역명,동,호수,메모,상태\n" +
-        "아파트,101,제일풍경채1차 101동,101동,101호,,미방문\n" +
-        "아파트,101,제일풍경채1차 101동,101동,102호,오전 방문 선호,미방문\n" +
-        "상가,201,중앙프라자 1층,1층,101호,,미방문\n" +
-        "일반구역,301,옥정동 주택가 1구역,,12-3번지,,미방문\n";
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+     function downloadSampleExcel() {
+      const sampleCsv = "\uFEFF분류,구역번호,구역명,주소,동,호수,메모,상태\n" +
+        "아파트,101,양주 푸르지오 101동 1~2라인,경기도 양주시 옥정동로 123,101동,101호,,미방문\n" +
+        "아파트,101,양주 푸르지오 101동 1~2라인,,101동,102호,,미방문\n" +
+        "상가,201,옥정 중심상가 A동,경기도 양주시 화합로 456,1층,101호,카페,미방문\n" +
+        "일반구역,301,덕계동 빌라단지,경기도 양주시 평화로 789,가동,201호,,미방문\n";
+
+      const blob = new Blob([sampleCsv], { type: "text/csv;charset=utf-8;" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = "구역카드_통합양식_샘플.csv";
+      link.download = "온라인구역카드_샘플양식.csv";
       link.click();
+    }
+
+    function openPasteExcelModal() {
+      const modal = document.getElementById("pasteExcelModal");
+      const ta = document.getElementById("pasteExcelTextarea");
+      if (ta) ta.value = "";
+      if (modal) modal.style.display = "flex";
+      if (ta) setTimeout(function() { ta.focus(); }, 50);
+    }
+
+    function closePasteExcelModal() {
+      const modal = document.getElementById("pasteExcelModal");
+      if (modal) modal.style.display = "none";
+    }
+
+    function processPastedExcel() {
+      const ta = document.getElementById("pasteExcelTextarea");
+      const rawText = ta ? ta.value : "";
+      if (!rawText.trim()) {
+        alert("붙여넣은 엑셀 데이터가 없습니다.");
+        return;
+      }
+      const added = parseAndAppendZoneText(rawText, true);
+      if (added) {
+        closePasteExcelModal();
+      }
     }
 
     function handleExcelUpload(event) {
@@ -655,90 +712,7 @@ if (isAdminUser(target) && USERS.filter(u => isAdminUser(u)).length <= 1) {
       const reader = new FileReader();
       reader.onload = function(e) {
         try {
-          const text = e.target.result.replace(/^\uFEFF/, "");
-          const lines = text.split(/\r?\n/).filter(function(line) { return line.trim() !== ""; });
-          if (lines.length < 2) {
-            alert("데이터가 없습니다. 첫 줄은 제목, 둘째 줄부터 구역 데이터를 입력해 주세요.");
-            return;
-          }
-
-          const headers = lines.shift().split(",").map(function(h) { return h.trim().replace(/^"|"$/g, ""); });
-          const idxCat = headers.indexOf("분류");
-          const idxNum = headers.indexOf("구역번호");
-          const idxName = headers.indexOf("구역명");
-          const idxDong = headers.indexOf("동");
-          const idxHo = headers.indexOf("호수");
-          const idxMemo = headers.indexOf("메모");
-          const idxStatus = headers.indexOf("상태");
-          const idxDate = headers.indexOf("배정날짜");
-
-          if (idxName === -1 || idxHo === -1) {
-          alert("엑셀 파일을 [다른 이름으로 저장] -> [CSV UTF-8(쉼표로 분리)(*.csv)] 형식으로 저장했는지,\n그리고 첫 줄에 '분류, 구역번호, 구역명, 동, 호수, 메모, 상태'가 있는지 확인해 주세요!");
-            return;
-          }
-
-          const zoneMap = {};
-          let idCounter = Date.now();
-          let validCount = 0;
-
-          lines.forEach(function(line) {
-            const cols = line.split(",").map(function(c) { return c.trim().replace(/^"|"$/g, ""); });
-
-const rawCat = idxCat > -1 ? (cols[idxCat] || "").trim() : "";
-const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일반구역") ? rawCat : "일반구역";
-            const zNum = idxNum > -1 ? (cols[idxNum] || "") : "";
-            const zName = idxName > -1 ? (cols[idxName] || "") : "";
-            const dong = idxDong > -1 ? (cols[idxDong] || "") : "";
-            const ho = idxHo > -1 ? (cols[idxHo] || "") : "";
-            const memo = idxMemo > -1 ? (cols[idxMemo] || "") : "";
-            const status = idxStatus > -1 ? (cols[idxStatus] || "미방문") : "미방문";
-            const aDate = idxDate > -1 ? (cols[idxDate] || "") : "";
-
-            if ((!zNum && !zName) || (!dong && !ho)) return;
-            validCount++;
-
-            const groupKey = zNum ? (zNum + "_" + zName) : zName;
-            const displayTitle = zNum ? ("[" + zNum + "] " + zName) : zName;
-            const displayAddr = (dong && ho) ? (dong + " " + ho) : (dong || ho);
-
-            if (!zoneMap[groupKey]) {
-              zoneMap[groupKey] = {
-                id: "zone-" + (idCounter++),
-                category: zCat,
-                zoneNum: zNum,
-                rawZoneName: zName,
-                name: displayTitle,
-                assignedDate: aDate,
-                members: [],
-                houses: []
-              };
-            }
-            zoneMap[groupKey].houses.push({
-              id: idCounter++,
-              dong: dong,
-              ho: ho,
-              address: displayAddr,
-              memo: memo,
-              status: ["미방문", "만남", "부재", "방문금지"].includes(status) ? status : "미방문",
-              updatedBy: ""
-            });
-          });
-
-          const newZones = Object.values(zoneMap);
-          if (newZones.length === 0) {
-            alert("등록할 수 있는 유효한 구역 데이터가 없습니다.");
-            return;
-          }
-
-          if (confirm("총 " + newZones.length + "개의 구역(" + validCount + "개 세대)을 불러왔습니다.\n기존 구역 목록을 새 데이터로 교체할까요?")) {
-            ZONES_DATA = newZones;
-            selectedZoneId = null;
-            saveZones();
-            renderAdminPanel();
-            renderLobby();
-            renderActiveZone();
-            alert("구역 데이터가 성공적으로 등록되었습니다!");
-          }
+          parseAndAppendZoneText(e.target.result, false);
         } catch (err) {
           alert("파일 처리 중 오류: " + err.message);
         }
@@ -747,7 +721,104 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
       reader.readAsText(file, "UTF-8");
     }
 
-    function exportCurrentDataToExcel() {
+    function parseAndAppendZoneText(rawText, isPasted) {
+      const text = rawText.replace(/^\uFEFF/, "");
+      const lines = text.split(/\r?\n/).filter(function(line) { return line.trim() !== ""; });
+      if (lines.length < 2) {
+        alert("데이터가 부족합니다. 첫 줄은 제목(분류, 구역번호, 구역명, 주소, 동, 호수), 둘째 줄부터 데이터를 입력해 주세요.");
+        return false;
+      }
+
+      // 엑셀 복사(탭 구분)와 CSV(쉼표 구분) 자동 판별
+      const sep = (lines[0].indexOf("\t") > -1) ? "\t" : ",";
+      const headers = lines.shift().split(sep).map(function(h) { return h.trim().replace(/^"|"$/g, ""); });
+
+      const idxCat = headers.indexOf("분류");
+      const idxNum = headers.indexOf("구역번호");
+      const idxName = headers.indexOf("구역명");
+      const idxAddr = headers.indexOf("주소") > -1 ? headers.indexOf("주소") : headers.indexOf("구역대표주소");
+      const idxDong = headers.indexOf("동");
+      const idxHo = headers.indexOf("호수");
+      const idxMemo = headers.indexOf("메모");
+      const idxStatus = headers.indexOf("상태");
+      const idxDate = headers.indexOf("배정날짜");
+
+      if (idxName === -1 || idxHo === -1) {
+        alert("첫 줄 제목에 '분류, 구역번호, 구역명, 주소, 동, 호수' 항목이 포함되어 있는지 확인해 주세요!");
+        return false;
+      }
+
+      const zoneMap = {};
+      let idCounter = Date.now();
+      let validCount = 0;
+
+      lines.forEach(function(line) {
+        const cols = line.split(sep).map(function(c) { return c.trim().replace(/^"|"$/g, ""); });
+
+        const rawCat = idxCat > -1 ? (cols[idxCat] || "").trim() : "";
+        const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일반구역") ? rawCat : "일반구역";
+        const zNum = idxNum > -1 ? (cols[idxNum] || "") : "";
+        const zName = idxName > -1 ? (cols[idxName] || "") : "";
+        const zAddr = idxAddr > -1 ? (cols[idxAddr] || "") : "";
+        const dong = idxDong > -1 ? (cols[idxDong] || "") : "";
+        const ho = idxHo > -1 ? (cols[idxHo] || "") : "";
+        const memo = idxMemo > -1 ? (cols[idxMemo] || "") : "";
+        const status = idxStatus > -1 ? (cols[idxStatus] || "미방문") : "미방문";
+        const aDate = idxDate > -1 ? (cols[idxDate] || "") : "";
+
+        if ((!zNum && !zName) || (!dong && !ho)) return;
+        validCount++;
+
+        const groupKey = zNum ? (zNum + "_" + zName) : zName;
+        const displayTitle = zNum ? ("[" + zNum + "] " + zName) : zName;
+        const displayAddr = (dong && ho) ? (dong + " " + ho) : (dong || ho);
+
+        if (!zoneMap[groupKey]) {
+          zoneMap[groupKey] = {
+            id: "zone-" + (idCounter++),
+            category: zCat,
+            zoneNum: zNum,
+            rawZoneName: zName,
+            name: displayTitle,
+            address: zAddr,
+            assignedDate: aDate,
+            members: [],
+            houses: []
+          };
+        } else if (!zoneMap[groupKey].address && zAddr) {
+          zoneMap[groupKey].address = zAddr;
+        }
+
+        zoneMap[groupKey].houses.push({
+          id: idCounter++,
+          dong: dong,
+          ho: ho,
+          address: displayAddr,
+          memo: memo,
+          status: ["미방문", "만남", "부재", "방문금지"].includes(status) ? status : "미방문",
+          updatedBy: ""
+        });
+      });
+
+      const newZones = Object.values(zoneMap);
+      if (newZones.length === 0) {
+        alert("등록할 수 있는 유효한 구역 데이터가 없습니다.");
+        return false;
+      }
+
+      if (confirm("총 " + newZones.length + "개의 구역(" + validCount + "개 세대)을 불러왔습니다.\n기존 구역 카드 목록에 이어서 추가할까요?")) {
+        ZONES_DATA = ZONES_DATA.concat(newZones);
+        saveZones();
+        renderAdminPanel();
+        renderLobby();
+        renderActiveZone();
+        alert("기존 목록에 " + newZones.length + "개 구역 카드가 추가되었습니다! (현재 총 " + ZONES_DATA.length + "개)");
+        return true;
+      }
+      return false;
+    }
+
+      function exportCurrentDataToExcel() {
           let csv = "\uFEFF구역번호,구역명,구역대표주소,진행률,1차배정일,2차배정일,인도자\n";
 
       ZONES_DATA.forEach(function(z) {
@@ -810,6 +881,55 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
       adminSearchKeyword = val.trim().toLowerCase();
       renderAdminZoneBody();
     }
+
+    function updateBulkDeleteBtn() {
+      const checked = document.querySelectorAll(".zone-bulk-chk:checked");
+      const btn = document.getElementById("btnBulkDeleteZones");
+      if (!btn) return;
+      if (checked.length > 0) {
+        btn.style.display = "inline-block";
+        btn.innerText = "🗑️ 선택 삭제 (" + checked.length + ")";
+      } else {
+        btn.style.display = "none";
+      }
+    }
+
+    function toggleSelectAllVisibleZones(isChecked) {
+      document.querySelectorAll(".zone-bulk-chk").forEach(function(cb) {
+        cb.checked = isChecked;
+      });
+      updateBulkDeleteBtn();
+    }
+
+      function deleteSelectedZones() {
+      const checked = Array.from(document.querySelectorAll(".zone-bulk-chk:checked"));
+      if (checked.length === 0) return;
+
+      if (!confirm("선택한 " + checked.length + "개의 구역 카드를 한 번에 삭제할까요?\n(삭제된 데이터는 복구할 수 없습니다.)")) return;
+
+      const targetIds = checked.map(function(cb) { return String(cb.value).trim(); });
+      let removedCount = 0;
+
+      for (let i = ZONES_DATA.length - 1; i >= 0; i--) {
+        const currentId = String(ZONES_DATA[i].id).trim();
+        if (targetIds.indexOf(currentId) > -1) {
+          if (String(selectedZoneId) === currentId) selectedZoneId = null;
+          ZONES_DATA.splice(i, 1);
+          removedCount++;
+        }
+      }
+
+      if (window.ZONES_DATA && window.ZONES_DATA !== ZONES_DATA) {
+        window.ZONES_DATA = ZONES_DATA;
+      }
+
+      saveZones();
+      renderAdminPanel();
+      renderLobby();
+      if (typeof renderActiveZone === "function") renderActiveZone();
+      alert(removedCount + "개의 구역 카드가 일괄 삭제되었습니다!");
+    }
+
 
     function renderAdminPanel() {
       const panel = document.getElementById("adminPanel") || document.querySelector(".control-panel");
@@ -890,18 +1010,26 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
         return;
       }
 
-      // 2단계: 폴더 진입 후 또는 검색 중일 때 -> 상단 뒤로가기 헤더 표시
+           // 2단계: 폴더 진입 후 또는 검색 중일 때 -> 상단 뒤로가기 헤더 + 선택 삭제 바 표시
       const navHeader = document.createElement("div");
-      navHeader.style.cssText = "display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:#e2e8f0; border-radius:8px; margin-bottom:10px;";
+      navHeader.style.cssText = "display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; padding:8px 10px; background:#e2e8f0; border-radius:8px; margin-bottom:10px;";
       const headerLabel = isSearching ? ("🔍 '" + escapeHtml(adminSearchKeyword) + "' 검색 결과") : ("📂 " + adminFolderFilter + " 폴더");
       navHeader.innerHTML =
-        '<button type="button" onclick="adminSearchKeyword=\'\'; const inp=document.getElementById(\'adminSearchInp\'); if(inp) inp.value=\'\'; selectAdminFolder(null)" style="background:#fff; color:#1e293b; border:1px solid #cbd5e1; padding:5px 10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">← 폴더 목록으로</button>' +
-        '<span style="font-weight:800; font-size:13px; color:#1e293b;">' + headerLabel + '</span>';
+        '<div style="display:flex; align-items:center; gap:6px;">' +
+          '<button type="button" onclick="adminSearchKeyword=\'\'; const inp=document.getElementById(\'adminSearchInp\'); if(inp) inp.value=\'\'; selectAdminFolder(null)" style="background:#fff; color:#1e293b; border:1px solid #cbd5e1; padding:5px 10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">← 폴더 목록</button>' +
+          '<span style="font-weight:800; font-size:13px; color:#1e293b;">' + headerLabel + '</span>' +
+        '</div>' +
+        '<div style="display:flex; align-items:center; gap:6px;">' +
+          '<label style="display:flex; align-items:center; gap:4px; font-size:11px; font-weight:bold; color:#334155; background:#fff; padding:4px 8px; border-radius:6px; border:1px solid #cbd5e1; cursor:pointer;">' +
+            '<input type="checkbox" id="adminSelectAllChk" onchange="toggleSelectAllVisibleZones(this.checked)" style="width:14px; height:14px; cursor:pointer;"> 전체선택' +
+          '</label>' +
+          '<button type="button" id="btnBulkDeleteZones" onclick="deleteSelectedZones()" style="display:none; background:#dc2626; color:#fff; border:none; padding:5px 10px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">🗑️ 선택 삭제 (0)</button>' +
+        '</div>';
       body.appendChild(navHeader);
 
       let filteredZones = ZONES_DATA.filter(function(z) {
         if (!isSearching && getZoneCategory(z) !== adminFolderFilter) return false;
-              if (adminOnlyUnassigned && (z.assignedDate || z.firstDate || z.personalAssignee)) return false;
+        if (adminOnlyUnassigned && (z.assignedDate || z.firstDate || z.personalAssignee)) return false;
         if (isSearching && z.name.toLowerCase().indexOf(adminSearchKeyword) === -1) return false;
         return true;
       });
@@ -914,13 +1042,13 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
         return;
       }
 
-               function buildAdminCard(z) {
+      function buildAdminCard(z) {
         const prog = getZoneProgress(z);
         const isHold = (getZoneCategory(z) === "보류");
         const isToday = (z.assignedDate === todayStr);
         const card = document.createElement("div");
         card.className = "admin-zone-card" + (isToday ? " assigned-today" : "");
-               card.onclick = function() {
+        card.onclick = function() {
           if (isHold) {
             alert("⏸️ 현재 '보류 구역(배정중지)' 상태입니다.\n배정을 재개하려면 우측 [✏️ 수정] 버튼에서 구역 분류를 변경해 주세요.");
             return;
@@ -932,8 +1060,7 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
           openDateModal(z.id);
         };
 
-
-              const d1 = z.firstDate || z.assignedDate || "";
+        const d1 = z.firstDate || z.assignedDate || "";
         const d2 = z.secondDate || "";
         let dateBadge = d1 ? ("📅 1차 : " + d1 + " &nbsp;|&nbsp; 2차 : " + d2) : "미배정 (클릭하여 배정)";
         if (z.personalAssignee) {
@@ -945,22 +1072,19 @@ const zCat = (rawCat === "아파트" || rawCat === "상가" || rawCat === "일�
           dateBadge = '<span style="color:#475569; font-weight:700;">⏸️ 배정 중지' + holdDateTxt + '</span>';
         }
 
-
-
         const holdMemoHtml = (isHold && z.holdReason)
           ? '<div style="margin-top:5px; padding:4px 8px; background:#fef2f2; border:1px solid #fecaca; border-radius:6px; font-size:11px; color:#b91c1c; font-weight:600;">📝 보류 사유: ' + escapeHtml(z.holdReason) + '</div>'
           : '';
 
         const pctClass = prog.percent === 100 ? "pct-badge done-100" : "pct-badge";
         const barClass = prog.percent === 100 ? "mini-bar-fill done-100" : "mini-bar-fill";
+        const chkHtml = '<input type="checkbox" class="zone-bulk-chk" value="' + z.id + '" onclick="event.stopPropagation(); updateBulkDeleteBtn();" style="width:17px; height:17px; margin-right:10px; cursor:pointer; flex-shrink:0;">';
         const editBtn = '<button type="button" onclick="event.stopPropagation(); openEditZoneModal(\'' + z.id + '\')" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:6px 10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; margin-right:4px;">✏️ 수정</button>';
-             const revokeBtn = (z.assignedDate || z.firstDate || z.personalAssignee) ? '<button type="button" class="btn-revoke" onclick="event.stopPropagation(); revokeZoneDate(\'' + z.id + '\')">회수</button>' : '';
+        const revokeBtn = (z.assignedDate || z.firstDate || z.personalAssignee) ? '<button type="button" class="btn-revoke" onclick="event.stopPropagation(); revokeZoneDate(\'' + z.id + '\')">회수</button>' : '';
 
-
-        card.innerHTML = '<div style="flex:1;"><div style="font-weight:700; font-size:14px; color:#1e293b;">' + z.name + ' <span class="' + pctClass + '">' + prog.percent + '% (' + prog.done + '/' + prog.total + ')</span></div><div style="font-size:12px; color:#64748b; margin-top:4px;">' + dateBadge + '</div>' + holdMemoHtml + '<div class="mini-bar-bg"><div class="' + barClass + '" style="width:' + prog.percent + '%;"></div></div></div><div style="display:flex; align-items:center;">' + editBtn + revokeBtn + '</div>';
+        card.innerHTML = chkHtml + '<div style="flex:1;"><div style="font-weight:700; font-size:14px; color:#1e293b;">' + z.name + ' <span class="' + pctClass + '">' + prog.percent + '% (' + prog.done + '/' + prog.total + ')</span></div><div style="font-size:12px; color:#64748b; margin-top:4px;">' + dateBadge + '</div>' + holdMemoHtml + '<div class="mini-bar-bg"><div class="' + barClass + '" style="width:' + prog.percent + '%;"></div></div></div><div style="display:flex; align-items:center;">' + editBtn + revokeBtn + '</div>';
         return card;
       }
-
 
       if (adminFolderFilter === "아파트" && !isSearching) {
         const complexGroups = {};
